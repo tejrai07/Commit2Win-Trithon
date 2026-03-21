@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import uvicorn
+from pymongo import MongoClient
 
 # ============================================================================
 # CONFIG
@@ -42,16 +43,45 @@ ALERT_TIER_NAMES = {v: k for k, v in ALERT_TIER_MAP.items()}  # reverse map
 # ============================================================================
 # LOAD MODEL & SCALER
 # ============================================================================
-MODEL_PATH = os.path.join(MODELS_DIR, "methane_lstm_transformer.keras")
+MODEL_PATH = os.path.join(MODELS_DIR, "methane_lstm_transformer")
 SCALER_PATH = os.path.join(MODELS_DIR, "feature_scaler.pkl")
 
 print(f"Loading model from: {MODEL_PATH}")
-model = tf.keras.models.load_model(MODEL_PATH)
+# In Keras 3, a generic SavedModel relies on TFSMLayer
+model_layer = tf.keras.layers.TFSMLayer(MODEL_PATH, call_endpoint='serving_default')
 print("Model loaded successfully.")
 
 print(f"Loading scaler from: {SCALER_PATH}")
 scaler = joblib.load(SCALER_PATH)
 print("Scaler loaded successfully.")
+
+# ============================================================================
+# DATABASE SETUP (MongoDB)
+# ============================================================================
+try:
+    mongo_client = MongoClient("mongodb://localhost:27017/", serverSelectionTimeoutMS=2000)
+    mongo_client.server_info() # trigger exception if cannot connect
+    db = mongo_client["methane_db"]
+    print("Connected to MongoDB successfully.")
+except Exception as e:
+    print(f"Warning: Could not connect to MongoDB. Is it running? Error: {e}")
+    db = None
+
+# ============================================================================
+# EXPLAINABLE AI SETUP (Gemini)
+# ============================================================================
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    try:
+        from google import genai
+        genai_client = genai.Client(api_key=GEMINI_API_KEY)
+        print("Explainable AI (Gemini) initialized successfully.")
+    except Exception as e:
+        print(f"Warning: Could not initialize google-genai. Error: {e}")
+        genai_client = None
+else:
+    print("Warning: GEMINI_API_KEY not found in environment. Explainable AI will use fallback text.")
+    genai_client = None
 
 # ============================================================================
 # IN-MEMORY SLIDING WINDOW BUFFER (per sensor)
@@ -84,6 +114,7 @@ app.add_middleware(
 class SensorReading(BaseModel):
     """Single sensor reading payload."""
     sensor_id: str = Field(..., example="SEN-001")
+    timestamp: Optional[str] = Field(None, example="2023-10-25T14:30:00Z")
     ch4_concentration_ppm: float = Field(..., example=450.5)
     temperature_celsius: float = Field(..., example=28.3)
     pressure_kPa: float = Field(..., example=101.2)
@@ -95,6 +126,8 @@ class SensorReading(BaseModel):
     ch4_rolling_mean_30min: float = Field(..., example=430.8)
     ch4_rate_of_change: float = Field(..., example=2.3)
     lel_percent: float = Field(..., example=0.9)
+    hour_sin: float = Field(..., example=0.5)
+    hour_cos: float = Field(..., example=0.866)
 
 
 class PredictionResponse(BaseModel):
@@ -105,6 +138,8 @@ class PredictionResponse(BaseModel):
     minutes_to_lel_breach: float
     alert_tier: str
     alert_tier_confidence: dict
+    actions_triggered: List[str]                  
+    explainable_ai_reasoning: Optional[str]       
     buffer_size: int
     buffer_full: bool
 
@@ -124,11 +159,36 @@ class HealthResponse(BaseModel):
     feature_count: int
     features: List[str]
     active_sensors: int
+    explainable_ai_enabled: bool
 
 
 # ============================================================================
 # PREDICTION LOGIC
 # ============================================================================
+def get_ai_explanation(alert_tier: str, latest_features: list) -> str:
+    """Uses Gemini API to explain the alert tier based on the latest sensor window."""
+    if not genai_client:
+        return f"Fallback reasoning: System detected signature of {alert_tier} without AI context enabled."
+        
+    try:
+        metrics_summary = f"Methane: {latest_features[0]}ppm, Temp: {latest_features[1]}C, Change Rate: {latest_features[9]}ppm/m, LEL: {latest_features[10]*100}%"
+        
+        prompt = (f"You are the Explainable AI layer for an industrial methane safety platform.\n"
+                  f"Our LSTM-Transformer model just predicted a '{alert_tier}' alert.\n"
+                  f"The most recent sensor readings directly from the edge are: {metrics_summary}.\n"
+                  f"Provide a 1-sentence ONLY professional, technical explanation to the safety engineer "
+                  f"of exactly why this sensor combination is concerning and what it indicates.")
+                  
+        response = genai_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+        )
+        return str(response.text).strip()
+    except Exception as e:
+        print(f"Gemini API Error: {e}")
+        return f"Warning: The current sensor combination resembles past {alert_tier} signatures (AI Explanation Failed)."
+
+
 def make_prediction(sensor_id: str, buffer: deque) -> dict:
     """
     Given a full buffer (SEQUENCE_LENGTH readings), scale features,
@@ -143,16 +203,36 @@ def make_prediction(sensor_id: str, buffer: deque) -> dict:
     # Reshape for model: (1, seq_len, n_features)
     X = scaled_features.reshape(1, SEQUENCE_LENGTH, len(FEATURE_COLS))
 
-    # Predict
-    reg_pred, clf_pred = model.predict(X, verbose=0)
+    # Predict using TFSMLayer
+    preds = model_layer(X)
+    
+    # Extract values from dict
+    spike_pred = preds['output_0'].numpy()[0][0]
+    breach_pred = preds['output_1'].numpy()[0][0]
+    clf_probs = preds['output_2'].numpy()[0]
 
-    spike_probability = float(np.clip(reg_pred[0][0], 0.0, 1.0))
-    minutes_to_breach = float(max(reg_pred[0][1], 0.0))
+    spike_probability = float(np.clip(spike_pred, 0.0, 1.0))
+    minutes_to_breach = float(max(breach_pred, 0.0))
 
     # Classification probabilities
     clf_probs = clf_pred[0]
     alert_idx = int(np.argmax(clf_probs))
     alert_tier = ALERT_TIER_NAMES[alert_idx]
+
+    # Explainable AI & Hardware Triggers Implementation
+    actions_triggered = []
+    explainable_ai_reasoning = None
+
+    if alert_tier == "RED_EVACUATION" or spike_probability > 0.7:
+        actions_triggered = [
+            "SMS_SENT_TO_SAFETY_SUPERVISOR",
+            "AUTOMATED_VALVES_SHUTOFF"
+        ]
+        explainable_ai_reasoning = get_ai_explanation(alert_tier, raw_features[-1])
+
+    elif alert_tier == "YELLOW_CAUTION":
+        actions_triggered = ["SMS_WARNING_SENT"]
+        explainable_ai_reasoning = get_ai_explanation(alert_tier, raw_features[-1])
 
     return {
         "sensor_id": sensor_id,
@@ -165,6 +245,8 @@ def make_prediction(sensor_id: str, buffer: deque) -> dict:
             "YELLOW_CAUTION": round(float(clf_probs[1]), 4),
             "RED_EVACUATION": round(float(clf_probs[2]), 4),
         },
+        "actions_triggered": actions_triggered,
+        "explainable_ai_reasoning": explainable_ai_reasoning,
         "buffer_size": len(buffer),
         "buffer_full": len(buffer) == SEQUENCE_LENGTH,
     }
@@ -195,6 +277,7 @@ def health():
         "feature_count": len(FEATURE_COLS),
         "features": FEATURE_COLS,
         "active_sensors": len(sensor_buffers),
+        "explainable_ai_enabled": genai_client is not None,
     }
 
 
@@ -205,18 +288,27 @@ def predict(reading: SensorReading):
     and return a prediction once the buffer is full (SEQUENCE_LENGTH readings).
     """
     try:
-        # Extract feature values in the correct order
+        # 1. Log raw sensor data
+        if db is not None:
+            reading_dict = reading.dict()
+            reading_dict["logged_at"] = datetime.utcnow().isoformat() + "Z"
+            db.sensor_data.insert_one(reading_dict)
+
+        # 2. Extract feature values in the correct order
         features = [getattr(reading, col) for col in FEATURE_COLS]
 
-        # Add to sensor-specific buffer
+        # 3. Add to sensor-specific buffer
         sensor_buffers[reading.sensor_id].append(features)
         buffer = sensor_buffers[reading.sensor_id]
+
+        # Use reading timestamp if provided, else current time
+        reading_time = reading.timestamp or (datetime.utcnow().isoformat() + "Z")
 
         if len(buffer) < SEQUENCE_LENGTH:
             # Buffer not yet full — return a "buffering" response
             return PredictionResponse(
                 sensor_id=reading.sensor_id,
-                timestamp=datetime.utcnow().isoformat() + "Z",
+                timestamp=reading_time,
                 spike_probability=0.0,
                 minutes_to_lel_breach=9999.0,
                 alert_tier="GREEN_NORMAL",
@@ -225,12 +317,22 @@ def predict(reading: SensorReading):
                     "YELLOW_CAUTION": 0.0,
                     "RED_EVACUATION": 0.0,
                 },
+                actions_triggered=[],
+                explainable_ai_reasoning=None,
                 buffer_size=len(buffer),
                 buffer_full=False,
             )
 
         # Buffer full — make a real prediction
         result = make_prediction(reading.sensor_id, buffer)
+        result["timestamp"] = reading_time  # Keep original timestamp if historical
+        
+        # 4. Log prediction to MongoDB
+        if db is not None:
+            pred_log = result.copy()
+            pred_log["logged_at"] = datetime.utcnow().isoformat() + "Z"
+            db.predictions.insert_one(pred_log)
+            
         return PredictionResponse(**result)
 
     except Exception as e:
@@ -244,15 +346,27 @@ def predict_batch(batch: BatchSensorReading):
     Useful for bulk data ingestion.
     """
     results = []
+    
+    # 1. Log all raw data at once
+    if db is not None and batch.readings:
+        docs = []
+        for r in batch.readings:
+            d = r.dict()
+            d["logged_at"] = datetime.utcnow().isoformat() + "Z"
+            docs.append(d)
+        db.sensor_data.insert_many(docs)
+        
     for reading in batch.readings:
         features = [getattr(reading, col) for col in FEATURE_COLS]
         sensor_buffers[reading.sensor_id].append(features)
         buffer = sensor_buffers[reading.sensor_id]
 
+        reading_time = reading.timestamp or (datetime.utcnow().isoformat() + "Z")
+
         if len(buffer) < SEQUENCE_LENGTH:
             results.append(PredictionResponse(
                 sensor_id=reading.sensor_id,
-                timestamp=datetime.utcnow().isoformat() + "Z",
+                timestamp=reading_time,
                 spike_probability=0.0,
                 minutes_to_lel_breach=9999.0,
                 alert_tier="GREEN_NORMAL",
@@ -261,12 +375,26 @@ def predict_batch(batch: BatchSensorReading):
                     "YELLOW_CAUTION": 0.0,
                     "RED_EVACUATION": 0.0,
                 },
+                actions_triggered=[],
+                explainable_ai_reasoning=None,
                 buffer_size=len(buffer),
                 buffer_full=False,
             ))
         else:
             result = make_prediction(reading.sensor_id, buffer)
+            result["timestamp"] = reading_time
             results.append(PredictionResponse(**result))
+
+    # 2. Log predictions batch
+    if db is not None and results:
+        pred_logs = []
+        for res in results:
+            if res.buffer_full:  # Only log real predictions, not buffering states
+                p = res.dict()
+                p["logged_at"] = datetime.utcnow().isoformat() + "Z"
+                pred_logs.append(p)
+        if pred_logs:
+            db.predictions.insert_many(pred_logs)
 
     return results
 

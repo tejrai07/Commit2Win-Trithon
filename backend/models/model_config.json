@@ -1,5 +1,21 @@
 {
+  "version": "2.0",
   "feature_columns": [
+    "ch4_concentration_ppm",
+    "temperature_celsius",
+    "pressure_kPa",
+    "humidity_percent",
+    "wind_speed_ms",
+    "co2_ppm",
+    "ch4_rolling_mean_5min",
+    "ch4_rolling_std_5min",
+    "ch4_rolling_mean_30min",
+    "ch4_rate_of_change",
+    "lel_percent",
+    "hour_sin",
+    "hour_cos"
+  ],
+  "base_feature_columns": [
     "ch4_concentration_ppm",
     "temperature_celsius",
     "pressure_kPa",
@@ -12,15 +28,27 @@
     "ch4_rate_of_change",
     "lel_percent"
   ],
-  "target_regression": [
-    "spike_probability_score",
-    "minutes_to_lel_breach"
+  "engineered_features": [
+    "hour_sin",
+    "hour_cos"
   ],
+  "target_spike": "spike_probability_score",
+  "target_breach": "minutes_to_lel_breach",
   "target_classification": "alert_tier",
   "alert_tier_map": {
     "GREEN_NORMAL": 0,
     "YELLOW_CAUTION": 1,
     "RED_EVACUATION": 2
   },
-  "sequence_length": 10
+  "sequence_length": 20,
+  "spike_threshold": 0.7,
+  "improvements": [
+    "class_weighting",
+    "sequence_length_20",
+    "separate_target_normalization",
+    "cyclical_time_features",
+    "sigmoid_spike_head",
+    "3x_transformer_blocks",
+    "larger_lstm_units"
+  ]
 }
