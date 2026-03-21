@@ -1,0 +1,26 @@
+{
+  "feature_columns": [
+    "ch4_concentration_ppm",
+    "temperature_celsius",
+    "pressure_kPa",
+    "humidity_percent",
+    "wind_speed_ms",
+    "co2_ppm",
+    "ch4_rolling_mean_5min",
+    "ch4_rolling_std_5min",
+    "ch4_rolling_mean_30min",
+    "ch4_rate_of_change",
+    "lel_percent"
+  ],
+  "target_regression": [
+    "spike_probability_score",
+    "minutes_to_lel_breach"
+  ],
+  "target_classification": "alert_tier",
+  "alert_tier_map": {
+    "GREEN_NORMAL": 0,
+    "YELLOW_CAUTION": 1,
+    "RED_EVACUATION": 2
+  },
+  "sequence_length": 10
+}

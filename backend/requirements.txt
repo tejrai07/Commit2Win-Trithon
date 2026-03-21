@@ -1,4 +1,10 @@
-Flask==3.0.3
-Werkzeug==3.0.3
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+pydantic==2.9.0
 tensorflow
 numpy
+pandas
+scikit-learn
+matplotlib
+joblib
+python-multipart
