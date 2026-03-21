@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area 
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ReferenceArea 
 } from 'recharts';
 import { 
   AlertTriangle, Activity, Thermometer, CheckCircle, 
@@ -9,61 +9,94 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// --- Sub-Components for Ultra-Premium Look ---
-
-const AnomalyRing = ({ probability }) => {
-  const percentage = Math.round(probability * 100);
-  const strokeDasharray = `${percentage}, 100`;
-  const color = probability > 0.7 ? '#ef4444' : probability > 0.4 ? '#f59e0b' : '#10b981';
-
+// --- Sub-Components ---
+const GaugeChart = ({ probability = 0 }) => {
+  const safeProb = probability || 0;
+  const percentage = Math.round(safeProb * 100);
+  const rotation = (percentage / 100) * 180;
   return (
-    <div className="relative flex items-center justify-center w-32 h-32 group">
-      <div className="absolute inset-0 bg-white/5 rounded-full backdrop-blur-3xl group-hover:bg-white/10 transition-colors" />
-      <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90 drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">
-        <path
-          className="stroke-white/5"
-          strokeWidth="3"
-          fill="none"
-          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-        />
-        <path
-          stroke={color}
-          strokeWidth="3"
-          strokeDasharray={strokeDasharray}
-          strokeLinecap="round"
-          fill="none"
-          className="transition-all duration-1000 ease-out"
-          style={{ filter: `drop-shadow(0 0 4px ${color})` }}
-          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-        />
-      </svg>
-      <div className="absolute flex flex-col items-center">
-        <span className="text-2xl font-black text-white tracking-tighter">{percentage}%</span>
-        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Risk</span>
+      <div className="relative w-full h-24 flex flex-col items-center justify-end overflow-hidden pb-1">
+        <svg viewBox="0 0 200 100" className="w-full h-full drop-shadow-[0_0_8px_rgba(255,255,255,0.05)]">
+           <path d="M 20 90 A 70 70 0 0 1 180 90" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="15" strokeLinecap="round" />
+           <path d="M 20 90 A 70 70 0 0 1 70 40" fill="none" stroke="#10b981" strokeWidth="15" strokeOpacity="0.3" />
+           <path d="M 70 40 A 70 70 0 0 1 130 40" fill="none" stroke="#f59e0b" strokeWidth="15" strokeOpacity="0.3" />
+           <path d="M 130 40 A 70 70 0 0 1 180 90" fill="none" stroke="#ef4444" strokeWidth="15" strokeOpacity="0.3" />
+           
+           <path d="M 20 90 A 70 70 0 0 1 180 90" fill="none" stroke={percentage > 70 ? '#ef4444' : percentage > 40 ? '#f59e0b' : '#10b981'} 
+                 strokeWidth="15" strokeLinecap="round" strokeDasharray="220" strokeDashoffset={220 - (220 * Math.min(percentage, 100) / 100)} 
+                 className="transition-all duration-1000 ease-out" />
+                 
+           <g transform={`rotate(${rotation} 100 90)`} className="origin-[100px_90px] transition-transform duration-1000 ease-out">
+              <polygon points="96,90 104,90 100,20" fill="#fff" opacity="0.9" />
+              <circle cx="100" cy="90" r="5" fill="#06b6d4" />
+           </g>
+        </svg>
+        <div className="absolute bottom-2 flex flex-col items-center translate-y-3">
+            <span className="text-xl font-black text-white leading-none">{percentage}%</span>
+            <span className="text-[7px] uppercase tracking-widest text-slate-500 font-bold">Explosion Risk</span>
+        </div>
       </div>
-    </div>
   );
 };
 
-const MetricOrb = ({ label, value, unit, icon: Icon, colorClass, themeColor }) => (
-  <div className="industrial-card p-6 flex flex-col justify-between group hover:scale-[1.02] transition-transform shadow-2xl relative overflow-hidden">
-    <div className="flex justify-between items-start z-10">
-      <div className={`p-3 rounded-2xl bg-white/5 border border-white/10 group-hover:border-white/20 transition-colors`}>
-        <Icon className={`${colorClass} w-5 h-5`} />
+const SensorMetricCard = ({ label, value, unit, icon: Icon, colorClass }) => (
+  <div className="industrial-card p-4 flex flex-col justify-between group flex-1">
+    <div className="flex justify-between items-start mb-2">
+      <div className={`p-2 rounded-lg bg-white/5 border border-white/10 group-hover:border-white/20 transition-colors`}>
+        <Icon className={`${colorClass} w-4 h-4`} />
       </div>
-      <Zap className="w-3 h-3 text-white/5 group-hover:text-white/20 transition-colors" />
     </div>
-    <div className="mt-8 space-y-1 z-10">
-      <div className="flex items-baseline gap-2">
-        <span className="text-4xl font-black text-white tracking-tighter leading-none group-hover:scale-105 origin-left transition-transform">
+    <div>
+      <div className="flex items-baseline gap-1">
+        <span className="text-2xl font-black text-white tracking-tighter">
               {typeof value === 'number' ? (Math.round(value * 10) / 10).toFixed(1) : (value || '0.0')}
         </span>
-        <span className="text-slate-500 font-mono font-bold text-[10px] uppercase tracking-widest">{unit}</span>
+        <span className="text-slate-500 font-mono text-[9px] uppercase tracking-widest">{unit}</span>
       </div>
-      <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">{label}</p>
+      <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">{label}</p>
     </div>
-    <div className={`absolute bottom-0 left-0 h-0.5 bg-blue-500 transition-all duration-500 w-0 group-hover:w-full opacity-30`} />
   </div>
+);
+
+const AlertStatusBar = ({ tier }) => (
+    <div className="flex gap-1 w-32 h-2">
+        <div className={`flex-1 rounded-full transition-all duration-500 bg-white/10 ${tier === 'GREEN_NORMAL' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : ''}`} />
+        <div className={`flex-1 rounded-full transition-all duration-500 bg-white/10 ${tier === 'YELLOW_CAUTION' ? 'bg-hazard-amber shadow-[0_0_8px_#f59e0b]' : ''}`} />
+        <div className={`flex-1 rounded-full transition-all duration-500 bg-white/10 ${tier === 'RED_EVACUATION' ? 'bg-danger-red shadow-[0_0_8px_#ef4444] animate-pulse' : ''}`} />
+    </div>
+);
+
+const ToggleRow = ({ active, label }) => (
+    <div className="flex justify-between items-center p-2.5 bg-black/20 rounded-lg border border-white/5">
+        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+        <div className={`w-8 h-4 rounded-full p-0.5 transition-colors duration-300 ${active ? (label.includes('Valve') ? 'bg-danger-red' : 'bg-cyan-500') : 'bg-slate-700'}`}>
+            <div className={`w-3 h-3 bg-white rounded-full shadow-md transition-transform duration-300 ${active ? 'translate-x-4' : 'translate-x-0'}`} />
+        </div>
+    </div>
+);
+
+const FeatureContributionBar = ({ features = [] }) => (
+   <div className="flex flex-col gap-2 w-full mt-4">
+       <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 mb-1">XAI Feature Weightings</span>
+       {features?.map(f => (
+           <div key={f.name} className="flex items-center gap-3">
+               <span className="text-[8px] w-14 font-bold text-slate-400 uppercase">{f.name}</span>
+               <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+                   <div className="h-full bg-cyan-500" style={{ width: `${f.weight}%` }} />
+               </div>
+               <span className="text-[8px] font-mono text-white text-right w-6">{f.weight}%</span>
+           </div>
+       ))}
+   </div>
+);
+
+const SensorLegend = () => (
+    <div className="flex gap-4 items-center justify-end text-[8px] font-black uppercase tracking-widest mt-2 mb-1 opacity-70">
+        <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-cyan-500" /> SEN-001 <span className="text-slate-600">(Main)</span></div>
+        <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" /> SEN-002</div>
+        <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-plasma-purple opacity-60" /> SEN-003</div>
+        <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-fusion-orange opacity-60" /> SEN-004-6</div>
+    </div>
 );
 
 // --- Main Dashboard Component ---
@@ -87,9 +120,16 @@ const Dashboard = () => {
                 hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
             });
             const pred = data.predictions[idx] || {};
+            const main = reading.ch4_concentration_ppm;
+            const hash = new Date(reading.timestamp).getTime() % 100;
             return {
               time: timeStr,
-              ch4: reading.ch4_concentration_ppm,
+              sen001: main,
+              sen002: Math.max(0, main * 0.95 + (hash % 50)),
+              sen003: Math.max(0, main * 1.05 - (hash % 60)),
+              sen004: Math.max(0, main * 0.9 + (hash % 80)),
+              sen005: Math.max(0, main * 1.1 - (hash % 70)),
+              sen006: Math.max(0, main * 0.85 + (hash % 100)),
               temp: reading.temperature_celsius,
               pressure: reading.pressure_kPa,
               risk: pred.spike_probability || 0,
@@ -112,7 +152,7 @@ const Dashboard = () => {
   }, [isDemoMode]);
 
   const alertTier = latestPrediction?.alert_tier || "WAITING"; 
-  const ch4Value = latestPrediction?.ch4_concentration_ppm || historicData[historicData.length - 1]?.ch4 || 0;
+  const ch4Value = latestPrediction?.ch4_concentration_ppm || historicData[historicData.length - 1]?.sen001 || 0;
   
   // Dynamic Graph Color Logic
   const graphColor = useMemo(() => {
@@ -136,8 +176,11 @@ const Dashboard = () => {
   const triggerDemo = () => {
     setIsDemoMode(true);
     const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const main = 4250;
     setHistoricData(prev => [...prev.slice(-14), { 
-        time: nowStr, ch4: 4250, temp: 48.5, pressure: 112.4, risk: 0.98 
+        time: nowStr, 
+        sen001: main, sen002: main*0.95, sen003: main*1.05, sen004: main*1.1, sen005: main*0.9, sen006: main*0.85,
+        temp: 48.5, pressure: 112.4, risk: 0.98 
     }]);
     setLatestPrediction({
       alert_tier: "RED_EVACUATION",
@@ -151,18 +194,31 @@ const Dashboard = () => {
     });
   };
 
+  const formatCountdown = (minutesDecimal) => {
+      if (!minutesDecimal || minutesDecimal > 99) return "SAFE";
+      const m = Math.floor(minutesDecimal);
+      const s = Math.floor((minutesDecimal - m) * 60);
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const xaiFeatures = [
+      { name: "TEMP STR", weight: 42 },
+      { name: "CH4 GRAD", weight: 35 },
+      { name: "PRESS VAR", weight: 23 }
+  ];
+
   const handleLogout = () => navigate('/login');
 
   return (
-    <div className="h-screen flex bg-industrial-void text-slate-200 overflow-hidden selection:bg-blue-500/30 font-sans">
+    <div className="h-screen flex bg-industrial-void text-slate-200 overflow-hidden selection:bg-cyan-500/30 font-sans">
       
       {/* --- SIDEBAR NAV --- */}
       <nav className="w-16 border-r border-white/5 bg-black/40 flex flex-col items-center py-6 gap-8 z-50 flex-shrink-0">
-         <div className="p-2.5 bg-blue-600/20 rounded-xl border border-blue-500/30 mb-4 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-            <Activity className="text-blue-400 w-5 h-5" />
+         <div className="p-2.5 bg-cyan-600/20 rounded-xl border border-cyan-500/30 mb-4 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+            <Activity className="text-cyan-400 w-5 h-5" />
          </div>
          <div className="flex flex-col gap-6 text-slate-500">
-            <button className="p-2 hover:bg-white/5 rounded-lg transition-colors text-blue-400 border border-blue-500/20"><Shield className="w-5 h-5" /></button>
+            <button className="p-2 hover:bg-white/5 rounded-lg transition-colors text-cyan-400 border border-cyan-500/20"><Shield className="w-5 h-5" /></button>
          </div>
          <div className="mt-auto">
             <button onClick={handleLogout} className="p-2 text-slate-600 hover:text-danger-red transition-colors"><LogOut className="w-5 h-5" /></button>
@@ -179,13 +235,11 @@ const Dashboard = () => {
            </div>
            
            <div className="flex gap-8 items-center px-6 py-1.5 bg-black/40 rounded-full border border-white/5">
-              <div className="flex flex-col items-end">
-                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">System Health</span>
-                 <span className={`text-[10px] font-black uppercase ${alertTier === 'GREEN_NORMAL' ? 'text-emerald-400' : 'text-hazard-amber animate-pulse'}`}>
-                    SYSTEM {alertTier === 'GREEN_NORMAL' ? 'NOMINAL' : 'COMPROMISED'}
-                 </span>
+              <div className="flex flex-col items-center">
+                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Alert Status</span>
+                 <AlertStatusBar tier={alertTier} />
               </div>
-              <div className="h-6 w-[1px] bg-white/10" />
+              <div className="h-6 w-[1px] bg-white/10 mx-2" />
               <div className="flex flex-col items-end">
                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Forecasting Accuracy</span>
                  <span className="text-[10px] font-black text-white uppercase font-mono">99.93%</span>
@@ -193,7 +247,7 @@ const Dashboard = () => {
               <div className="h-6 w-[1px] bg-white/10" />
               <button 
                   onClick={isDemoMode ? () => setIsDemoMode(false) : triggerDemo}
-                  className="px-4 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 rounded-lg text-[9px] font-bold text-blue-400 transition-all active:scale-95 shimmer uppercase tracking-widest"
+                  className="px-4 py-1.5 bg-cyan-600/10 hover:bg-cyan-600/20 border border-cyan-500/30 rounded-lg text-[9px] font-bold text-cyan-400 transition-all active:scale-95 shimmer uppercase tracking-widest"
               >
                   {isDemoMode ? "Resume Flow" : "Simulate Breach"}
               </button>
@@ -229,16 +283,10 @@ const Dashboard = () => {
                         </div>
                     </div>
 
-                    <div className="flex-1 min-h-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={historicData}>
-                                <defs>
-                                    <linearGradient id="colorDynamic" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor={graphColor} stopOpacity={0.4}/>
-                                        <stop offset="95%" stopColor={graphColor} stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="5 5" stroke="#ffffff08" vertical={false} />
+                    <div className="flex-1 min-h-0 flex flex-col mt-4">
+                        <ResponsiveContainer width="100%" height="85%">
+                            <LineChart data={historicData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
                                 <XAxis dataKey="time" stroke="#475569" fontSize={9} tickLine={false} axisLine={false} dy={10} />
                                 <YAxis 
                                     stroke="#475569" 
@@ -249,49 +297,51 @@ const Dashboard = () => {
                                     label={{ value: 'PPM (CONC)', angle: -90, position: 'insideLeft', fill: '#475569', fontSize: 8, fontWeight: 'bold' }} 
                                 />
                                 <Tooltip 
-                                    cursor={{ stroke: graphColor, strokeWidth: 1 }}
-                                    contentStyle={{ backgroundColor: 'rgba(2, 6, 23, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                                    contentStyle={{ backgroundColor: 'rgba(2, 6, 23, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                                    itemStyle={{ fontSize: 10, fontWeight: 'bold' }}
+                                    labelStyle={{ fontSize: 10, color: '#94a3b8', marginBottom: 4 }}
                                 />
-                                <Area 
-                                    type="monotone" 
-                                    dataKey="ch4" 
-                                    stroke={graphColor} 
-                                    strokeWidth={3} 
-                                    fill="url(#colorDynamic)" 
-                                    animationDuration={500} 
-                                />
-                            </AreaChart>
+                                
+                                {historicData.length > 5 && (
+                                    <ReferenceArea 
+                                        x1={historicData[Math.floor(historicData.length * 0.8)]?.time} 
+                                        x2={historicData[historicData.length - 1]?.time} 
+                                        strokeOpacity={0.3} 
+                                        fill="#06b6d4" 
+                                        fillOpacity={0.05} 
+                                    />
+                                )}
+
+                                <Line type="monotone" dataKey="sen001" name="SEN-001" stroke={graphColor} strokeWidth={3} dot={false} isAnimationActive={false} />
+                                <Line type="monotone" dataKey="sen002" name="SEN-002" stroke="#10b981" strokeWidth={1.5} strokeOpacity={0.5} dot={false} />
+                                <Line type="monotone" dataKey="sen003" name="SEN-003" stroke="#8b5cf6" strokeWidth={1.5} strokeOpacity={0.5} dot={false} />
+                                <Line type="monotone" dataKey="sen004" name="SEN-004" stroke="#f97316" strokeWidth={1} strokeDasharray="4 2" strokeOpacity={0.4} dot={false} />
+                                <Line type="monotone" dataKey="sen005" name="SEN-005" stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 2" strokeOpacity={0.4} dot={false} />
+                                <Line type="monotone" dataKey="sen006" name="SEN-006" stroke="#fbbf24" strokeWidth={1} strokeDasharray="4 2" strokeOpacity={0.4} dot={false} />
+                            </LineChart>
                         </ResponsiveContainer>
+                        <SensorLegend />
                     </div>
                 </section>
 
-                {/* Breach Clock - Digital Reference Style */}
-                <section className="flex-1 industrial-card p-6 flex flex-col justify-between border-t-4 border-t-hazard-amber group">
-                    <div className="flex justify-between items-start mb-4">
-                       <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">LEL Breach Vector</h3>
-                       <div className="scale-50 origin-top-right grayscale opacity-50">
-                          <AnomalyRing probability={latestPrediction?.spike_probability || 0} />
-                       </div>
+                {/* NEXT SPIKE Countdown & Explosion Risk Gauge */}
+                <section className="flex-1 industrial-card border-t-4 border-t-hazard-amber group p-0 flex flex-col overflow-hidden">
+                    <div className="p-4 pb-0 flex justify-between items-start">
+                       <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                           <Clock className="w-3 h-3 text-hazard-amber" /> critical vector
+                       </h3>
                     </div>
                     
-                    <div className="flex flex-col items-center justify-center py-6 bg-black/40 rounded-xl border border-white/5 shadow-inner grow my-2">
-                       <span className={`text-6xl font-black font-mono tracking-tighter leading-none ${latestPrediction?.minutes_to_lel_breach < 5 ? 'text-danger-red animate-pulse' : 'text-white'}`}>
-                          {(!latestPrediction || latestPrediction.minutes_to_lel_breach > 100) ? "SAFE" : latestPrediction.minutes_to_lel_breach.toFixed(1)}
+                    {/* Orbitron digital countdown */}
+                    <div className="flex flex-col items-center justify-center pt-4 pb-1">
+                       <span style={{ fontFamily: '"Orbitron", sans-serif' }} className={`text-6xl font-black tracking-widest leading-none drop-shadow-xl ${latestPrediction?.minutes_to_lel_breach < 5 ? 'text-danger-red animate-pulse' : 'text-cyan-400'}`}>
+                          {formatCountdown(latestPrediction?.minutes_to_lel_breach || 100)}
                        </span>
-                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.5em] mt-2">Minutes ETA</span>
+                       <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.5em] mt-3">NEXT SPIKE (ETA)</span>
                     </div>
 
-                    <div className="flex flex-col gap-2 mt-auto">
-                       <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-600 tracking-widest">
-                          <span>Risk Certainty</span>
-                          <span>{Math.round((latestPrediction?.spike_probability || 0) * 100)}%</span>
-                       </div>
-                       <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                          <div 
-                             className={`h-full transition-all duration-1000 ${latestPrediction?.minutes_to_lel_breach < 5 ? 'bg-danger-red' : 'bg-hazard-amber'}`}
-                             style={{ width: `${Math.max(5, 100 - (latestPrediction?.minutes_to_lel_breach || 101))}%` }}
-                          />
-                       </div>
+                    <div className="mt-auto bg-black/40 border-t border-white/5 relative flex-1 flex flex-col justify-end">
+                       <GaugeChart probability={latestPrediction?.spike_probability || 0} />
                     </div>
                 </section>
             </div>
@@ -299,69 +349,58 @@ const Dashboard = () => {
             {/* --- SECONDARY COMMAND ROW --- */}
             <div className="flex gap-5 flex-1 min-h-0">
                 
-                {/* AI Tactical Unit */}
-                <section className="flex-[1.5] industrial-card p-8 bg-blue-600/[0.04] flex flex-col justify-center gap-4 relative group">
+                {/* AI Tactical Unit + Feature Contribution Bar */}
+                <section className="flex-[1.5] industrial-card p-6 bg-cyan-600/[0.04] flex flex-col justify-center gap-3 relative group overflow-hidden">
                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                      <Cpu className="w-16 h-16 text-blue-400 rotate-12" />
+                      <Cpu className="w-24 h-24 text-cyan-400 rotate-12" />
                    </div>
-                   <div className="flex items-center gap-4 text-blue-400">
-                      <div className="w-10 h-[1px] bg-blue-500/30" />
+                   <div className="flex items-center gap-4 text-cyan-400">
+                      <div className="w-10 h-[1px] bg-cyan-500/30" />
                       <h3 className="text-[10px] font-black uppercase tracking-[0.4em]">Neural Insight Terminal 0xFLASH</h3>
-                      <div className="w-10 h-[1px] bg-blue-500/30" />
+                      <div className="w-10 h-[1px] bg-cyan-500/30" />
                    </div>
-                   <div className="border-l-4 border-blue-500/20 pl-8 overflow-hidden">
-                      <p className="text-xl leading-snug text-slate-100 font-medium italic tracking-tight line-clamp-3">
+                   <div className="border-l-4 border-cyan-500/20 pl-6 overflow-hidden mt-1">
+                      <p className="text-[13px] leading-snug text-slate-200 font-medium italic tracking-tight line-clamp-2">
                          "{aiReasoning}"
                       </p>
                    </div>
-                   <div className="flex gap-8 mt-4 text-[9px] font-black uppercase text-slate-600 tracking-widest">
-                      <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" /> Uplink Stable</div>
+                   
+                   {/* XAI Features implementation */}
+                   <FeatureContributionBar features={xaiFeatures} />
+
+                   <div className="flex gap-8 mt-auto text-[8px] font-black uppercase text-slate-600 tracking-widest pt-3">
+                      <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce" /> Uplink Stable</div>
                       <div className="flex items-center gap-2"><RefreshCw className="w-3 h-3 animate-spin-slow" /> Optimized Logic</div>
                    </div>
                 </section>
 
-                {/* Sub-Metric Bento + Action Cluster */}
-                <div className="flex-1 flex flex-col gap-5">
-                   <div className="grid grid-cols-2 gap-5 flex-1">
-                      <MetricOrb 
-                         label="Thermal State" 
+                {/* Sub-Metric Bento + ToggleRow */}
+                <div className="flex-1 flex flex-col gap-4">
+                   <div className="flex gap-4 flex-1">
+                      <SensorMetricCard 
+                         label="Thermal" 
                          value={latestPrediction?.temperature_celsius || historicData[historicData.length-1]?.temp} 
                          unit="°C" 
                          icon={Thermometer} 
                          colorClass="text-fusion-orange"
-                         themeColor="fusion-orange"
                       />
-                      <MetricOrb 
-                         label="Pressure PSI" 
+                      <SensorMetricCard 
+                         label="Pressure" 
                          value={latestPrediction?.pressure_kPa || historicData[historicData.length-1]?.pressure} 
                          unit="kPa" 
-                         icon={Zap} 
+                         icon={Gauge} 
                          colorClass="text-plasma-purple"
-                         themeColor="plasma-purple"
                       />
                    </div>
 
-                   {/* Action Toggles Cluster */}
-                   <section className="industrial-card p-4 bg-black/40 flex items-center gap-4">
-                      <div className="flex-1 flex items-center gap-4 px-4 py-3 bg-white/2 rounded-xl border border-white/5 hover:border-blue-500/20 transition-all group active:scale-[0.98] cursor-pointer">
-                         <div className={`p-2.5 rounded-lg ${alertTier !== 'GREEN_NORMAL' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-slate-800 text-slate-600'}`}>
-                            <Smartphone className="w-5 h-5" />
-                         </div>
-                         <div>
-                            <div className="font-black text-white italic text-xs">BROADCAST</div>
-                            <div className="text-[8px] font-black uppercase text-slate-500">GSM Link: {alertTier !== 'GREEN_NORMAL' ? 'ENCRYPTING' : 'READY'}</div>
-                         </div>
+                   {/* Toggle Row Implementation */}
+                   <section className="industrial-card p-3 bg-black/40 flex flex-col items-center border border-white/5">
+                      <div className="flex items-center gap-2 mb-2 self-start px-1 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                          <Settings className="w-3 h-3" /> System Overrides
                       </div>
-
-                      <div className="flex-1 flex items-center gap-4 px-4 py-3 bg-white/2 rounded-xl border border-white/5 hover:border-danger-red/20 transition-all group active:scale-[0.98] cursor-pointer">
-                         <div className={`p-2.5 rounded-lg ${alertTier === 'RED_EVACUATION' ? 'bg-danger-red/20 text-danger-red border border-danger-red/30' : 'bg-slate-800 text-slate-600'}`}>
-                            <PowerOff className="w-5 h-5" />
-                         </div>
-                         <div>
-                            <div className="font-black text-white italic text-xs">ISOLATION</div>
-                            <div className="text-[8px] font-black uppercase text-slate-500">Relay: {alertTier === 'RED_EVACUATION' ? 'LOCKED' : 'READY'}</div>
-                         </div>
-                      </div>
+                      <ToggleRow active={alertTier !== 'GREEN_NORMAL'} label="Automated SMS Relay" />
+                      <div className="w-full h-2" />
+                      <ToggleRow active={alertTier === 'RED_EVACUATION'} label="Primary Valve Isolation" />
                    </section>
                 </div>
             </div>

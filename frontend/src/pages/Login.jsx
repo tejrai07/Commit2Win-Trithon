@@ -21,26 +21,26 @@ const Login = () => {
     return (
         <div className="min-h-screen flex items-center justify-center bg-mesh p-4 overflow-hidden">
             {/* Dynamic Background Elements */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-600/10 rounded-full blur-[120px] animate-pulse" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/5 rounded-full blur-[150px] animate-pulse-slow" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.03)_0%,transparent_70%)] pointer-events-none" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.03)_0%,transparent_70%)] pointer-events-none" />
 
             <div className="industrial-card w-full max-w-md p-10 animate-float relative z-10 border-white/20 shadow-2xl">
                 {/* Decorative Shimmer Line */}
-                <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent shimmer" />
+                <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent shimmer" />
 
                 <div className="flex flex-col items-center mb-10">
                     <div className="relative group">
-                        <div className="absolute -inset-4 bg-blue-500/20 rounded-full blur-xl group-hover:bg-blue-500/30 transition-all duration-500" />
+                        <div className="absolute -inset-4 bg-cyan-500/20 rounded-full blur-xl group-hover:bg-cyan-500/30 transition-all duration-500" />
                         <div className="w-20 h-20 bg-white/5 backdrop-blur-3xl rounded-3xl flex items-center justify-center mb-4 border border-white/20 shadow-2xl relative z-10 overflow-hidden shimmer">
-                            <Shield className="text-blue-400 w-10 h-10 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                            <Shield className="text-cyan-400 w-10 h-10 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
                         </div>
                     </div>
                     <h1 className="text-3xl font-black tracking-tighter text-white mb-1 bg-gradient-to-br from-white to-slate-500 bg-clip-text text-transparent">
                         MethaneDetection Ai
                     </h1>
                     <div className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping" />
+                        <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-ping" />
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.3em]">Secure Node 0x7F2A</p>
                     </div>
                 </div>
@@ -49,10 +49,10 @@ const Login = () => {
                     <div className="space-y-2">
                         <label className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">
                             <span>Operator Identity</span>
-                            <span className="text-blue-500/50 italic">Required</span>
+                            <span className="text-cyan-500/50 italic">Required</span>
                         </label>
                         <div className="relative group">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
                             <input
                                 type="email"
                                 required
@@ -70,7 +70,7 @@ const Login = () => {
                             <Fingerprint className="w-3 h-3 text-emerald-500/50" />
                         </label>
                         <div className="relative group">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
                             <input
                                 type="password"
                                 required
