@@ -15,8 +15,8 @@ const GaugeChart = ({ probability = 0 }) => {
   const percentage = Math.round(safeProb * 100);
   const rotation = (percentage / 100) * 180;
   return (
-      <div className="relative w-full h-24 flex flex-col items-center justify-end overflow-hidden pb-1">
-        <svg viewBox="0 0 200 100" className="w-full h-full drop-shadow-[0_0_8px_rgba(255,255,255,0.05)]">
+      <div className="flex flex-col items-center w-full px-2 pb-2">
+        <svg viewBox="0 0 200 110" className="w-[170px] drop-shadow-[0_0_8px_rgba(255,255,255,0.05)] overflow-visible mx-auto">
            <path d="M 20 90 A 70 70 0 0 1 180 90" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="15" strokeLinecap="round" />
            <path d="M 20 90 A 70 70 0 0 1 70 40" fill="none" stroke="#10b981" strokeWidth="15" strokeOpacity="0.3" />
            <path d="M 70 40 A 70 70 0 0 1 130 40" fill="none" stroke="#f59e0b" strokeWidth="15" strokeOpacity="0.3" />
@@ -31,9 +31,9 @@ const GaugeChart = ({ probability = 0 }) => {
               <circle cx="100" cy="90" r="5" fill="#06b6d4" />
            </g>
         </svg>
-        <div className="absolute bottom-2 flex flex-col items-center translate-y-3">
+        <div className="flex flex-col items-center mt-[-15px] z-10 w-full mb-1">
             <span className="text-xl font-black text-white leading-none">{percentage}%</span>
-            <span className="text-[7px] uppercase tracking-widest text-slate-500 font-bold">Explosion Risk</span>
+            <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold mt-1.5 w-full text-center">Explosion Risk</span>
         </div>
       </div>
   );
@@ -59,10 +59,10 @@ const SensorMetricCard = ({ label, value, unit, icon: Icon, colorClass }) => (
 );
 
 const AlertStatusBar = ({ tier }) => (
-    <div className="flex gap-1 w-32 h-2">
-        <div className={`flex-1 rounded-full transition-all duration-500 bg-white/10 ${tier === 'GREEN_NORMAL' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : ''}`} />
-        <div className={`flex-1 rounded-full transition-all duration-500 bg-white/10 ${tier === 'YELLOW_CAUTION' ? 'bg-hazard-amber shadow-[0_0_8px_#f59e0b]' : ''}`} />
-        <div className={`flex-1 rounded-full transition-all duration-500 bg-white/10 ${tier === 'RED_EVACUATION' ? 'bg-danger-red shadow-[0_0_8px_#ef4444] animate-pulse' : ''}`} />
+    <div className="flex gap-1.5 w-40 h-2.5">
+        <div className={`flex-1 rounded-full transition-all duration-500 bg-white/10 ${tier === 'GREEN_NORMAL' ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' : ''}`} />
+        <div className={`flex-1 rounded-full transition-all duration-500 bg-white/10 ${tier === 'YELLOW_CAUTION' ? 'bg-hazard-amber shadow-[0_0_10px_#f59e0b]' : ''}`} />
+        <div className={`flex-1 rounded-full transition-all duration-500 bg-white/10 ${tier === 'RED_EVACUATION' ? 'bg-danger-red shadow-[0_0_10px_#ef4444] animate-pulse' : ''}`} />
     </div>
 );
 
@@ -235,8 +235,8 @@ const Dashboard = () => {
            </div>
            
            <div className="flex gap-8 items-center px-6 py-1.5 bg-black/40 rounded-full border border-white/5">
-              <div className="flex flex-col items-center">
-                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Alert Status</span>
+              <div className="flex flex-col items-center justify-center">
+                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Alert Status</span>
                  <AlertStatusBar tier={alertTier} />
               </div>
               <div className="h-6 w-[1px] bg-white/10 mx-2" />
@@ -333,14 +333,14 @@ const Dashboard = () => {
                     </div>
                     
                     {/* Orbitron digital countdown */}
-                    <div className="flex flex-col items-center justify-center pt-4 pb-1">
+                    <div className="flex flex-col items-center justify-center pt-2 pb-2 z-10">
                        <span style={{ fontFamily: '"Orbitron", sans-serif' }} className={`text-6xl font-black tracking-widest leading-none drop-shadow-xl ${latestPrediction?.minutes_to_lel_breach < 5 ? 'text-danger-red animate-pulse' : 'text-cyan-400'}`}>
                           {formatCountdown(latestPrediction?.minutes_to_lel_breach || 100)}
                        </span>
-                       <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.5em] mt-3">NEXT SPIKE (ETA)</span>
+                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.5em] mt-3">NEXT SPIKE (ETA)</span>
                     </div>
 
-                    <div className="mt-auto bg-black/40 border-t border-white/5 relative flex-1 flex flex-col justify-end">
+                    <div className="mt-auto bg-black/40 border-t border-white/5 relative flex flex-col justify-end pt-2">
                        <GaugeChart probability={latestPrediction?.spike_probability || 0} />
                     </div>
                 </section>
@@ -359,8 +359,8 @@ const Dashboard = () => {
                       <h3 className="text-[10px] font-black uppercase tracking-[0.4em]">Neural Insight Terminal 0xFLASH</h3>
                       <div className="w-10 h-[1px] bg-cyan-500/30" />
                    </div>
-                   <div className="border-l-4 border-cyan-500/20 pl-6 overflow-hidden mt-1">
-                      <p className="text-[13px] leading-snug text-slate-200 font-medium italic tracking-tight line-clamp-2">
+                   <div className="border-l-4 border-cyan-500/20 pl-6 mt-1 pb-1">
+                      <p className="text-[13px] leading-relaxed text-slate-200 font-medium italic tracking-tight">
                          "{aiReasoning}"
                       </p>
                    </div>
