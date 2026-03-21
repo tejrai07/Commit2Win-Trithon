@@ -3,11 +3,11 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ReferenceArea 
 } from 'recharts';
 import { 
-  AlertTriangle, Activity, Thermometer, CheckCircle, 
-  Smartphone, PowerOff, Shield, RefreshCw, LogOut,
-  Zap, Clock, Cpu, LayoutDashboard, Map, Search, Settings, Gauge
+  Activity, Shield, LogOut, Info, AlertTriangle, TrendingUp, Clock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 // --- Sub-Components ---
 const GaugeChart = ({ probability = 0 }) => {
@@ -116,7 +116,7 @@ const Dashboard = () => {
     const fetchLiveData = async () => {
       if (isDemoMode) return;
       try {
-        const res = await fetch('http://localhost:8000/history?limit=30');
+        const res = await fetch(`${API_BASE_URL}/history?limit=30`);
         const data = await res.json();
         
         if (data.sensor_data && data.predictions) {
@@ -162,7 +162,7 @@ const Dashboard = () => {
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const resp = await fetch('http://localhost:8000/simulation/status');
+        const resp = await fetch(`${API_BASE_URL}/simulation/status`);
         if (resp.ok) {
             const data = await resp.json();
             setIsStreamActive(data.active);
@@ -176,7 +176,7 @@ const Dashboard = () => {
 
   const toggleStream = async () => {
     try {
-      const resp = await fetch('http://localhost:8000/simulation/toggle', { method: 'POST' });
+      const resp = await fetch(`${API_BASE_URL}/simulation/toggle`, { method: 'POST' });
       if (resp.ok) {
           const data = await resp.json();
           setIsStreamActive(data.active);

@@ -5,7 +5,8 @@ import pandas as pd
 import numpy as np
 
 # Configuration
-API_URL = "http://localhost:8000/predict"
+API_URL = os.getenv("API_URL", "http://localhost:8000/predict")
+STATUS_URL = API_URL.replace("/predict", "/simulation/status")
 # Dataset is at the root directory of the project
 DATASET_PATH = r"c:\Users\KIIT\Downloads\methane_raw_training_dataset.csv"
 SENSOR_ID = "SEN-SIM-01"
@@ -56,7 +57,7 @@ def simulate_stream(df):
             
             # Check simulation status before sending
             try:
-                status_resp = requests.get("http://localhost:8000/simulation/status")
+                status_resp = requests.get(STATUS_URL)
                 if status_resp.status_code == 200 and not status_resp.json().get("active"):
                     print("Simulation SUSPENDED by user. Waiting...", end="\r")
                     time.sleep(2)
