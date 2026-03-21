@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keras model (too large for git, keep locally)
+*.keras
+*.h5
+
+# Node modules (frontend)
+node_modules/
+dist/
+build/
+
+# Environment variables
+.env
