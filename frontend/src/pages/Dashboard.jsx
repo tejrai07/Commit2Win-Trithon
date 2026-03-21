@@ -3,7 +3,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ReferenceArea 
 } from 'recharts';
 import { 
-  Activity, Shield, LogOut, Info, AlertTriangle, TrendingUp, Clock
+  Activity, Shield, LogOut, Info, AlertTriangle, TrendingUp, Clock,
+  Thermometer, Gauge, Cpu, RefreshCw, Settings, Zap, Map, Search,
+  PowerOff, Smartphone, CheckCircle, RefreshCcw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
