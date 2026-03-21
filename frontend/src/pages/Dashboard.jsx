@@ -239,11 +239,19 @@ const Dashboard = () => {
       return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const xaiFeatures = [
+  const xaiFeatures = useMemo(() => {
+    if (latestPrediction?.feature_importance) {
+      return Object.entries(latestPrediction.feature_importance).map(([name, weight]) => ({
+        name,
+        weight
+      }));
+    }
+    return [
       { name: "TEMP STR", weight: 42 },
       { name: "CH4 GRAD", weight: 35 },
       { name: "PRESS VAR", weight: 23 }
-  ];
+    ];
+  }, [latestPrediction]);
 
   const handleLogout = () => navigate('/login');
 
