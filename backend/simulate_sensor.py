@@ -6,13 +6,14 @@ import numpy as np
 
 # Configuration
 API_URL = "http://localhost:8000/predict"
-CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "methane_raw_training_dataset.csv")
+# Dataset is at the root directory of the project
+DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "methane_raw_training_dataset.csv")
 SENSOR_ID = "SEN-SIM-01"
-DELAY_SECONDS = 0.5  # Simulate real time (0.5s = 5 mins in dataset)
+DELAY_SECONDS = 2.0  # Send a reading every 2 seconds in dataset)
 
 def prepare_data():
-    if not os.path.exists(CSV_PATH):
-        print(f"Error: Dataset not found at {CSV_PATH}")
+    if not os.path.exists(DATASET_PATH):
+        print(f"Error: Dataset not found at {DATASET_PATH}")
         return None
         
     print(f"Loading dataset from {CSV_PATH}...")

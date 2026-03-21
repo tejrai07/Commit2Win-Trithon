@@ -424,6 +424,27 @@ def clear_sensor_buffer(sensor_id: str):
     raise HTTPException(status_code=404, detail=f"Sensor {sensor_id} not found")
 
 
+@app.get("/history", tags=["History"])
+def get_history(limit: int = 50):
+    """Fetch the latest sensor streams and predictions from MongoDB for the Dashboard."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="MongoDB not connected. Start MongoDB to view history.")
+        
+    try:
+        raw_cursor = db.sensor_data.find({}, {"_id": 0}).sort("logged_at", -1).limit(limit)
+        raw_data = list(raw_cursor)
+        
+        pred_cursor = db.predictions.find({}, {"_id": 0}).sort("logged_at", -1).limit(limit)
+        predictions = list(pred_cursor)
+        
+        return {
+            "sensor_data": raw_data[::-1],  # Reverse to chronological order for charts
+            "predictions": predictions[::-1]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # MAIN
 # ============================================================================
