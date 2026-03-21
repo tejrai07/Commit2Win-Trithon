@@ -8,14 +8,43 @@ from sklearn.metrics import classification_report, roc_auc_score
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-if not os.path.exists(os.path.join(BASE_DIR, "train_model.py")):
-    BASE_DIR = os.path.join(BASE_DIR, "..", "backend")
-else:
-    BASE_DIR = os.path.abspath(BASE_DIR)
-
-print(f"Using base dir: {BASE_DIR}")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
-DATA_DIR = os.path.join(BASE_DIR, "..", "methane")
+DATA_DIR = r"c:\Users\KIIT\Downloads"
+
+@tf.keras.utils.register_keras_serializable(package="MethanePredictor")
+class TransformerBlock(tf.keras.layers.Layer):
+    def __init__(self, embed_dim, num_heads, ff_dim, dropout_rate=0.1, **kwargs):
+        super().__init__(**kwargs)
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.ff_dim = ff_dim
+        self.dropout_rate = dropout_rate
+        self.att = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
+        self.ffn_dense1 = tf.keras.layers.Dense(ff_dim, activation="gelu")
+        self.ffn_dense2 = tf.keras.layers.Dense(embed_dim)
+        self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.dropout1 = tf.keras.layers.Dropout(dropout_rate)
+        self.dropout2 = tf.keras.layers.Dropout(dropout_rate)
+
+    def call(self, inputs, training=False):
+        attn_output = self.att(inputs, inputs)
+        attn_output = self.dropout1(attn_output, training=training)
+        out1 = self.layernorm1(inputs + attn_output)
+        ffn_output = self.ffn_dense1(out1)
+        ffn_output = self.ffn_dense2(ffn_output)
+        ffn_output = self.dropout2(ffn_output, training=training)
+        return self.layernorm2(out1 + ffn_output)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "embed_dim": self.embed_dim,
+            "num_heads": self.num_heads,
+            "ff_dim": self.ff_dim,
+            "dropout_rate": self.dropout_rate,
+        })
+        return config
 
 def main():
     try:
@@ -72,7 +101,10 @@ def main():
         )
         
         # Load model
-        model = tf.keras.models.load_model(os.path.join(MODEL_DIR, "methane_lstm_transformer"))
+        model = tf.keras.models.load_model(
+            os.path.join(MODEL_DIR, "methane_lstm_transformer.keras"),
+            custom_objects={"TransformerBlock": TransformerBlock}
+        )
         
         # Evaluate
         print("\nEvaluating model on test set...")

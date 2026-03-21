@@ -37,7 +37,7 @@ def simulate_stream(df):
         for index, row in df.iterrows():
             payload = {
                 "sensor_id": SENSOR_ID,
-                "location": str(row["location"]),
+                "location": str(row.get("location", "Sector 04-A")),
                 "timestamp": row["timestamp"].isoformat() + "Z",
                 "ch4_concentration_ppm": float(row["ch4_concentration_ppm"]),
                 "temperature_celsius": float(row["temperature_celsius"]),
@@ -54,6 +54,16 @@ def simulate_stream(df):
                 "hour_cos": float(row["hour_cos"])
             }
             
+            # Check simulation status before sending
+            try:
+                status_resp = requests.get("http://localhost:8000/simulation/status")
+                if status_resp.status_code == 200 and not status_resp.json().get("active"):
+                    print("Simulation SUSPENDED by user. Waiting...", end="\r")
+                    time.sleep(2)
+                    continue
+            except Exception:
+                pass # Fallback to sending if status endpoint is down
+
             # Send POST request
             response = requests.post(API_URL, json=payload)
             

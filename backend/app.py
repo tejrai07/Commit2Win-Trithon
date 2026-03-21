@@ -58,10 +58,16 @@ print("Scaler loaded successfully.")
 # ============================================================================
 # DATABASE SETUP (MongoDB)
 # ============================================================================
+# Database Configuration
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+DB_NAME = "methane_detection"
+
+# Simulation State
+simulation_active = True
 try:
-    mongo_client = MongoClient("mongodb://localhost:27017/", serverSelectionTimeoutMS=2000)
+    mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
     mongo_client.server_info() # trigger exception if cannot connect
-    db = mongo_client["methane_db"]
+    db = mongo_client[DB_NAME]
     print("Connected to MongoDB successfully.")
 except Exception as e:
     print(f"Warning: Could not connect to MongoDB. Is it running? Error: {e}")
@@ -83,10 +89,12 @@ else:
     print("Warning: GEMINI_API_KEY not found in environment. Explainable AI will use fallback text.")
     genai_client = None
 
-# ============================================================================
 # IN-MEMORY SLIDING WINDOW BUFFER (per sensor)
 # ============================================================================
 sensor_buffers: dict[str, deque] = defaultdict(lambda: deque(maxlen=SEQUENCE_LENGTH))
+
+# Buffer for the latest predictions to serve history when MongoDB is offline
+prediction_buffer: deque = deque(maxlen=SEQUENCE_LENGTH)
 
 # ============================================================================
 # FastAPI APP
@@ -139,7 +147,7 @@ class PredictionResponse(BaseModel):
     spike_probability: float
     minutes_to_lel_breach: float
     alert_tier: str
-    alert_tier_confidence: dict
+    alert_tier_confidence: dict[str, float]
     actions_triggered: List[str]                  
     explainable_ai_reasoning: Optional[str]       
     temperature_celsius: float
@@ -177,11 +185,11 @@ def get_ai_explanation(alert_tier: str, latest_features: list) -> str:
     try:
         metrics_summary = f"Methane: {latest_features[0]}ppm, Temp: {latest_features[1]}C, Change Rate: {latest_features[9]}ppm/m, LEL: {latest_features[10]*100}%"
         
-        prompt = (f"You are the Explainable AI layer for an industrial methane safety platform.\n"
-                  f"Our LSTM-Transformer model just predicted a '{alert_tier}' alert.\n"
-                  f"The most recent sensor readings directly from the edge are: {metrics_summary}.\n"
-                  f"Provide a 1-sentence ONLY professional, technical explanation to the safety engineer "
-                  f"of exactly why this sensor combination is concerning. ABSOLUTELY DO NOT mention raw temperature or pressure values in the output.")
+        prompt = (f"You are a helpful industrial safety assistant.\n"
+                  f"There is a '{alert_tier}' alert for methane gas.\n"
+                  f"Current metrics: {metrics_summary}.\n"
+                  f"In 1 simple, short sentence, tell a safety worker exactly what is happening and what they should do. "
+                  f"Do not use complex technical terms or raw numbers in the explanation.")
                   
         response = genai_client.models.generate_content(
             model='gemini-2.5-flash',
@@ -190,7 +198,7 @@ def get_ai_explanation(alert_tier: str, latest_features: list) -> str:
         return str(response.text).strip()
     except Exception as e:
         print(f"Gemini API Error: {e}")
-        return f"Neural Analysis: Detected kinetic anomalies in methane flow. Patterns match {alert_tier} profile. Continuous monitoring engaged."
+        return f"Neural Analysis: Detected anomalies. Patterns match {alert_tier} profile. Monitoring engaged."
 
 
 def make_prediction(sensor_id: str, buffer: deque) -> dict:
@@ -247,13 +255,13 @@ def make_prediction(sensor_id: str, buffer: deque) -> dict:
         "sensor_id": sensor_id,
         "location": "Sector 04-A", # This will be overwritten by the endpoint if provided
         "timestamp": datetime.utcnow().isoformat() + "Z",
-        "spike_probability": round(spike_probability, 4),
-        "minutes_to_lel_breach": round(minutes_to_breach, 2),
+        "spike_probability": float(round(float(spike_probability), 4)),
+        "minutes_to_lel_breach": float(round(float(minutes_to_breach), 2)),
         "alert_tier": alert_tier,
         "alert_tier_confidence": {
-            "GREEN_NORMAL": round(float(clf_probs[0]), 4),
-            "YELLOW_CAUTION": round(float(clf_probs[1]), 4),
-            "RED_EVACUATION": round(float(clf_probs[2]), 4),
+            "GREEN_NORMAL": float(round(float(clf_probs[0]), 4)),
+            "YELLOW_CAUTION": float(round(float(clf_probs[1]), 4)),
+            "RED_EVACUATION": float(round(float(clf_probs[2]), 4)),
         },
         "actions_triggered": actions_triggered,
         "explainable_ai_reasoning": explainable_ai_reasoning,
@@ -302,9 +310,12 @@ def predict(reading: SensorReading):
     try:
         # 1. Log raw sensor data
         if db is not None:
-            reading_dict = reading.dict()
-            reading_dict["logged_at"] = datetime.utcnow().isoformat() + "Z"
-            db.sensor_data.insert_one(reading_dict)
+            try:
+                reading_dict = reading.dict()
+                reading_dict["logged_at"] = datetime.utcnow().isoformat() + "Z"
+                db.sensor_data.insert_one(reading_dict)
+            except Exception as mongo_err:
+                print(f"MongoDB Log Error (Sensor Data): {mongo_err}")
 
         # 2. Extract feature values in the correct order
         features = [getattr(reading, col) for col in FEATURE_COLS]
@@ -343,15 +354,20 @@ def predict(reading: SensorReading):
         result["location"] = reading.location
         result["timestamp"] = reading_time  # Keep original timestamp if historical
         
-        # 4. Log prediction to MongoDB
+        # 4. Log prediction to MongoDB AND buffer in-memory
+        prediction_buffer.append(result)
         if db is not None:
-            pred_log = result.copy()
-            pred_log["logged_at"] = datetime.utcnow().isoformat() + "Z"
-            db.predictions.insert_one(pred_log)
+            try:
+                pred_log = result.copy()
+                pred_log["logged_at"] = datetime.utcnow().isoformat() + "Z"
+                db.predictions.insert_one(pred_log)
+            except Exception as mongo_err:
+                print(f"MongoDB Log Error: {mongo_err}")
             
         return PredictionResponse(**result)
 
     except Exception as e:
+        print(f"Prediction Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -407,14 +423,22 @@ def predict_batch(batch: BatchSensorReading):
 
     # 2. Log predictions batch
     if db is not None and results:
-        pred_logs = []
-        for res in results:
-            if res.buffer_full:  # Only log real predictions, not buffering states
-                p = res.dict()
-                p["logged_at"] = datetime.utcnow().isoformat() + "Z"
-                pred_logs.append(p)
-        if pred_logs:
-            db.predictions.insert_many(pred_logs)
+        try:
+            pred_logs = []
+            for res in results:
+                if res.buffer_full:  # Only log real predictions, not buffering states
+                    p = res.dict()
+                    p["logged_at"] = datetime.utcnow().isoformat() + "Z"
+                    pred_logs.append(p)
+            if pred_logs:
+                # Add to in-memory buffer as well
+                for p in pred_logs:
+                    # Strip the ISO timestamp for the buffer if needed, 
+                    # but result already has it. PredictionResponse expects it.
+                    prediction_buffer.append(p)
+                db.predictions.insert_many(pred_logs)
+        except Exception as mongo_err:
+            print(f"MongoDB Log Error (Batch Predictions): {mongo_err}")
 
     return results
 
@@ -446,28 +470,57 @@ def clear_sensor_buffer(sensor_id: str):
 
 @app.get("/history", tags=["History"])
 def get_history(limit: int = 50):
-    """Fetch the latest sensor streams and predictions from MongoDB for the Dashboard."""
-    if db is None:
-        raise HTTPException(status_code=503, detail="MongoDB not connected. Start MongoDB to view history.")
-        
-    try:
-        raw_cursor = db.sensor_data.find({}, {"_id": 0}).sort("logged_at", -1).limit(limit)
-        raw_data = list(raw_cursor)
-        
-        pred_cursor = db.predictions.find({}, {"_id": 0}).sort("logged_at", -1).limit(limit)
-        predictions = list(pred_cursor)
-        
-        return {
-            "sensor_data": raw_data[::-1],  # Reverse to chronological order for charts
-            "predictions": predictions[::-1]
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """Fetch the latest sensor streams and predictions from MongoDB OR in-memory buffers."""
+    if db is not None:
+        try:
+            raw_cursor = db.sensor_data.find({}, {"_id": 0}).sort("logged_at", -1).limit(limit)
+            raw_data = list(raw_cursor)
+            
+            pred_cursor = db.predictions.find({}, {"_id": 0}).sort("logged_at", -1).limit(limit)
+            predictions = list(pred_cursor)
+            
+            return {
+                "sensor_data": raw_data[::-1], 
+                "predictions": predictions[::-1]
+            }
+        except Exception as e:
+            print(f"MongoDB History Error: {e}")
+            # Fallback to in-memory if MongoDB fails mid-query
+    
+    # FALLBACK: Use in-memory buffers if MongoDB is down or fails
+    # We'll construct a simplified history from the current buffers
+    fallback_sensor_data = []
+    for sensor_id, buffer in sensor_buffers.items():
+        for i, features in enumerate(buffer):
+            # Reconstruct a basic record (only first few features used by dashboard)
+            fallback_sensor_data.append({
+                "sensor_id": sensor_id,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "ch4_concentration_ppm": features[0],
+                "temperature_celsius": features[1] if len(features) > 1 else 0.0,
+                "pressure_kPa": features[2] if len(features) > 2 else 0.0,
+                "location": "Industrial Sector Alpha" 
+            })
+    
+    return {
+        "sensor_data": fallback_sensor_data[-limit:],
+        "predictions": list(prediction_buffer)[-limit:]
+    }
 
 
 # ============================================================================
 # MAIN
 # ============================================================================
+@app.get("/simulation/status")
+async def get_simulation_status():
+    return {"active": simulation_active}
+
+@app.post("/simulation/toggle")
+async def toggle_simulation():
+    global simulation_active
+    simulation_active = not simulation_active
+    return {"active": simulation_active}
+
 if __name__ == "__main__":
     uvicorn.run(
         "app:app",

@@ -20,28 +20,28 @@ const Login = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-mesh p-4 overflow-hidden">
-            {/* Dynamic Background Elements */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-600/10 rounded-full blur-[120px] animate-pulse" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/5 rounded-full blur-[150px] animate-pulse-slow" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.03)_0%,transparent_70%)] pointer-events-none" />
+            {/* Dynamic Background Elements - Light Mode */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-100 rounded-full blur-[120px] opacity-30 animate-pulse" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-100 rounded-full blur-[150px] opacity-20 animate-pulse-slow" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.02)_0%,transparent_70%)] pointer-events-none" />
 
-            <div className="industrial-card w-full max-w-md p-10 animate-float relative z-10 border-white/20 shadow-2xl">
+            <div className="industrial-card w-full max-w-md p-10 animate-float relative z-10 border-slate-200 shadow-2xl shadow-slate-200/50 bg-white/90">
                 {/* Decorative Shimmer Line */}
-                <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent shimmer" />
+                <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent shimmer" />
 
                 <div className="flex flex-col items-center mb-10">
                     <div className="relative group">
-                        <div className="absolute -inset-4 bg-cyan-500/20 rounded-full blur-xl group-hover:bg-cyan-500/30 transition-all duration-500" />
-                        <div className="w-20 h-20 bg-white/5 backdrop-blur-3xl rounded-3xl flex items-center justify-center mb-4 border border-white/20 shadow-2xl relative z-10 overflow-hidden shimmer">
-                            <Shield className="text-cyan-400 w-10 h-10 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
+                        <div className="absolute -inset-4 bg-cyan-500/10 rounded-full blur-xl group-hover:bg-cyan-500/20 transition-all duration-500" />
+                        <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-4 border border-slate-200 shadow-xl relative z-10 overflow-hidden shimmer">
+                            <Shield className="text-cyan-600 w-10 h-10 drop-shadow-[0_0_8px_rgba(6,182,212,0.2)]" />
                         </div>
                     </div>
-                    <h1 className="text-3xl font-black tracking-tighter text-white mb-1 bg-gradient-to-br from-white to-slate-500 bg-clip-text text-transparent">
+                    <h1 className="text-3xl font-black tracking-tighter text-slate-900 mb-1 bg-gradient-to-br from-slate-900 to-slate-600 bg-clip-text text-transparent text-center">
                         MethaneDetection Ai
                     </h1>
                     <div className="flex items-center gap-2">
                         <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-ping" />
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.3em]">Secure Node 0x7F2A</p>
+                        <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.3em]">Secure Node 0x7F2A</p>
                     </div>
                 </div>
 
@@ -49,15 +49,15 @@ const Login = () => {
                     <div className="space-y-2">
                         <label className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">
                             <span>Operator Identity</span>
-                            <span className="text-cyan-500/50 italic">Required</span>
+                            <span className="text-cyan-600/60 italic font-bold">Required</span>
                         </label>
                         <div className="relative group">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-cyan-600 transition-colors" />
                             <input
                                 type="email"
                                 required
-                                className="glass-input w-full pl-12 active:scale-[0.99] transition-transform"
-                                placeholder="name@industrial-complex.com"
+                                className="glass-input w-full pl-12 active:scale-[0.99] transition-transform text-slate-900"
+                                placeholder="admin@methane-ai.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                             />
@@ -67,14 +67,14 @@ const Login = () => {
                     <div className="space-y-2">
                         <label className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">
                             <span>Access Vector</span>
-                            <Fingerprint className="w-3 h-3 text-emerald-500/50" />
+                            <Fingerprint className="w-3 h-3 text-emerald-600/50" />
                         </label>
                         <div className="relative group">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-cyan-600 transition-colors" />
                             <input
                                 type="password"
                                 required
-                                className="glass-input w-full pl-12 active:scale-[0.99] transition-transform"
+                                className="glass-input w-full pl-12 active:scale-[0.99] transition-transform text-slate-900"
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -85,11 +85,11 @@ const Login = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="btn-primary w-full py-4 mt-6 flex items-center justify-center gap-3 group relative overflow-hidden overflow-hidden shimmer"
+                        className="btn-primary w-full py-4 mt-6 flex items-center justify-center gap-3 group relative overflow-hidden shimmer"
                     >
                         {loading ? (
                             <div className="flex items-center gap-3">
-                                <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin" />
+                                <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                                 <span className="text-xs tracking-widest font-black uppercase">Syncing Uplink...</span>
                             </div>
                         ) : (
@@ -101,15 +101,15 @@ const Login = () => {
                     </button>
                 </form>
 
-                <div className="mt-10 pt-8 border-t border-white/10 flex items-start gap-4">
-                    <div className="p-2 bg-hazard-amber/10 rounded-lg border border-hazard-amber/20">
-                        <AlertTriangle className="w-5 h-5 text-hazard-amber" />
+                <div className="mt-10 pt-8 border-t border-slate-100 flex items-start gap-4">
+                    <div className="p-2 bg-amber-50 rounded-lg border border-amber-200">
+                        <AlertTriangle className="w-5 h-5 text-amber-600" />
                     </div>
                     <div>
-                        <p className="text-[9px] text-slate-500 leading-relaxed font-mono uppercase tracking-tighter">
+                        <p className="text-[9px] text-slate-500 leading-relaxed font-mono uppercase tracking-tighter font-bold">
                             Restricted Interface // Level 4 Clearance Required
                         </p>
-                        <p className="text-[10px] text-slate-400 font-medium leading-relaxed mt-1">
+                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">
                             Unauthorized access attempts will be isolated and logged via hardware-level tracing protocols. 
                         </p>
                     </div>
@@ -117,10 +117,10 @@ const Login = () => {
             </div>
 
             {/* Floating UI Accents */}
-            <div className="absolute top-10 left-10 text-white/5 font-mono text-xs hidden lg:block tracking-[0.5em] font-black uppercase">
+            <div className="absolute top-10 left-10 text-slate-200 font-mono text-xs hidden lg:block tracking-[0.5em] font-black uppercase">
                 Methane<br/>Detection<br/>Ai
             </div>
-            <div className="absolute bottom-10 right-10 text-white/5 font-mono text-xs hidden lg:block tracking-[0.5em] font-black uppercase">
+            <div className="absolute bottom-10 right-10 text-slate-200 font-mono text-xs hidden lg:block tracking-[0.5em] font-black uppercase">
                 Encryption<br/>V2.4.92<br/>AES-GCM
             </div>
         </div>

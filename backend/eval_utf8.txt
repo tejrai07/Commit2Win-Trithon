@@ -1,0 +1,27 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1774102441.147185   47584 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1774102446.038420   47584 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1774102449.567340   47584 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 AVX512F AVX512_VNNI AVX512_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+c:\Users\KIIT\OneDrive\Desktop\methane\venv\Lib\site-packages\keras\src\layers\layer.py:424: UserWarning: `build()` was called on layer 'transformer_1', however the layer does not have a `build()` method implemented and it looks like it has unbuilt state. This will cause the layer to be marked as built, despite not being actually built, which may cause failures down the line. Make sure to implement a proper `build()` method.
+  warnings.warn(
+c:\Users\KIIT\OneDrive\Desktop\methane\venv\Lib\site-packages\keras\src\layers\layer.py:424: UserWarning: `build()` was called on layer 'transformer_2', however the layer does not have a `build()` method implemented and it looks like it has unbuilt state. This will cause the layer to be marked as built, despite not being actually built, which may cause failures down the line. Make sure to implement a proper `build()` method.
+  warnings.warn(
+WARNING:tensorflow:From c:\Users\KIIT\OneDrive\Desktop\methane\venv\Lib\site-packages\keras\src\backend\tensorflow\core.py:232: The name tf.placeholder is deprecated. Please use tf.compat.v1.placeholder instead.
+
+WARNING:tensorflow:TensorFlow GPU support is not available on native Windows for TensorFlow >= 2.11. Even if CUDA/cuDNN are installed, GPU will not be used. Please use WSL2 or the TensorFlow-DirectML plugin.
+Model improvements included:
+ - class_weighting
+ - sequence_length_20
+ - separate_target_normalization
+ - cyclical_time_features
+ - sigmoid_spike_head
+ - 3x_transformer_blocks
+ - larger_lstm_units
+Error: A total of 4 objects could not be loaded. Example error message for object <Dense name=dense, built=True>:
+
+Layer 'dense' expected 2 variables, but received 0 variables during loading. Expected: ['kernel', 'bias']
+
+List of objects that could not be loaded:
+[<Dense name=dense, built=True>, <Dense name=dense_1, built=True>, <Dense name=dense_2, built=True>, <Dense name=dense_3, built=True>]
