@@ -5,9 +5,11 @@ import { AlertTriangle, Activity, Thermometer, Wind, CheckCircle, Smartphone, Po
 function App() {
   const [historicData, setHistoricData] = useState([]);
   const [latestPrediction, setLatestPrediction] = useState(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
     const fetchLiveData = async () => {
+      if (isDemoMode) return;
       try {
         const res = await fetch('http://localhost:8000/history?limit=20');
         const data = await res.json();
@@ -37,11 +39,28 @@ function App() {
     fetchLiveData();
     const intervalId = setInterval(fetchLiveData, 2000); // Polling every 2s to match IoT stream
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isDemoMode]);
 
-  const alertTier = latestPrediction?.alert_tier || "RED_EVACUATION"; // Mock state
+  const alertTier = latestPrediction?.alert_tier || "WAITING"; 
   const aiReasoning = latestPrediction?.explainable_ai_reasoning || 
-    "Methane rate of change (2.3ppm/m) combined with 28°C temperature indicates an accelerating dangerous leak.";
+    (alertTier === "GREEN_NORMAL" 
+      ? "AI Analysis: All sensor parameters are stable. No anomaly signatures detected in the current flow." 
+      : "Waiting for sensor data stream to initialize explainable AI context...");
+
+  // Hackathon Judges Demo Trigger
+  const triggerDemo = () => {
+    setIsDemoMode(true);
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setHistoricData(prev => [...prev.slice(-19), { time: nowStr, ch4: 4250, risk: 0.98 }]);
+    setLatestPrediction({
+      alert_tier: "RED_EVACUATION",
+      spike_probability: 0.98,
+      minutes_to_lel_breach: 1.1,
+      explainable_ai_reasoning: "[HACKATHON DEMO] Critical anomalous spike (4,250 ppm) detected instantaneously, simulating pipe rupture. Evacuation SMS dispatched, activating automated safety valves globally."
+    });
+  };
+
+  const resetStream = () => setIsDemoMode(false);
 
   return (
     <div className="min-h-screen p-6 relative overflow-hidden">
@@ -63,12 +82,17 @@ function App() {
         </div>
         
         <div className="flex items-center gap-4">
+          {isDemoMode ? (
+            <button onClick={resetStream} className="px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500 rounded-lg text-sm font-bold hover:bg-emerald-500/30 transition-all">Resume Live Stream</button>
+          ) : (
+            <button onClick={triggerDemo} className="px-4 py-2 bg-amber-500/20 text-amber-400 border border-amber-500 rounded-lg text-sm font-bold shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:bg-amber-500/30 transition-all">Test Demo (Judges)</button>
+          )}
           <div className="flex items-center gap-2 px-4 py-2 bg-slate-900/50 rounded-full border border-slate-700">
             <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isDemoMode ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
+              <span className={`relative inline-flex rounded-full h-3 w-3 ${isDemoMode ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
             </span>
-            <span className="text-sm font-medium text-slate-300">SEN-SIM-01 ONLINE</span>
+            <span className="text-sm font-medium text-slate-300">{isDemoMode ? "DEMO OVERRIDE" : "SEN-SIM-01 ONLINE"}</span>
           </div>
         </div>
       </header>
@@ -89,18 +113,22 @@ function App() {
             
             <div className="mb-6">
               <div className="text-4xl font-bold text-white mb-1">
-                {alertTier === 'RED_EVACUATION' ? 'EVACUATE' : 'NORMAL'}
+                {alertTier === 'WAITING' ? 'BOOTING...' : alertTier === 'RED_EVACUATION' ? 'EVACUATE' : alertTier === 'YELLOW_CAUTION' ? 'WARNING' : 'NORMAL'}
               </div>
               <div className="text-sm text-slate-400 uppercase tracking-wider font-medium">Alert Tier</div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 border-t border-slate-800 pt-6">
               <div>
-                <div className="text-2xl font-bold text-amber-400">82%</div>
+                <div className={`text-2xl font-bold ${alertTier === 'RED_EVACUATION' ? 'text-red-400' : alertTier === 'YELLOW_CAUTION' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {latestPrediction ? Math.round(latestPrediction.spike_probability * 100) : 0}%
+                </div>
                 <div className="text-xs text-slate-400 uppercase">Spike Probability</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-red-400">4.2m</div>
+                <div className={`text-2xl font-bold ${latestPrediction?.minutes_to_lel_breach < 30 ? 'text-red-400' : 'text-slate-300'}`}>
+                  {latestPrediction ? (latestPrediction.minutes_to_lel_breach > 100 ? '>100m' : `${latestPrediction.minutes_to_lel_breach}m`) : '--'}
+                </div>
                 <div className="text-xs text-slate-400 uppercase">Est. LEL Breach</div>
               </div>
             </div>
@@ -124,10 +152,10 @@ function App() {
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-800">
                  <div className="flex items-center gap-3">
-                   <Smartphone className={`w-5 h-5 ${alertTier !== 'GREEN_NORMAL' ? 'text-blue-400' : 'text-slate-600'}`} />
+                   <Smartphone className={`w-5 h-5 ${alertTier !== 'GREEN_NORMAL' && alertTier !== 'WAITING' ? 'text-blue-400 w-5 h-5' : 'text-slate-600'}`} />
                    <span className="text-slate-300 text-sm">SMS Safety Alert</span>
                  </div>
-                 {alertTier !== 'GREEN_NORMAL' ? (
+                 {alertTier !== 'GREEN_NORMAL' && alertTier !== 'WAITING' ? (
                    <span className="text-xs px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full font-medium">DISPATCHED</span>
                  ) : (
                    <span className="text-xs text-slate-600">STANDBY</span>
@@ -159,7 +187,7 @@ function App() {
             </div>
             <div className="flex-1 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mockData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <AreaChart data={historicData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorCh4" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#34d399" stopOpacity={0.3}/>
@@ -185,7 +213,7 @@ function App() {
             </div>
             <div className="flex-1 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mockData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <AreaChart data={historicData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorRisk" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#f87171" stopOpacity={0.3}/>

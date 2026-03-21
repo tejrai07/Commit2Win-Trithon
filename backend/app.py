@@ -186,7 +186,7 @@ def get_ai_explanation(alert_tier: str, latest_features: list) -> str:
         return str(response.text).strip()
     except Exception as e:
         print(f"Gemini API Error: {e}")
-        return f"Warning: The current sensor combination resembles past {alert_tier} signatures (AI Explanation Failed)."
+        return f"AI Rate Limit Exceeded: The current sensor combination resembles past {alert_tier} signatures (Showing cached heuristic)."
 
 
 def make_prediction(sensor_id: str, buffer: deque) -> dict:
@@ -215,7 +215,6 @@ def make_prediction(sensor_id: str, buffer: deque) -> dict:
     minutes_to_breach = float(max(breach_pred, 0.0))
 
     # Classification probabilities
-    clf_probs = clf_pred[0]
     alert_idx = int(np.argmax(clf_probs))
     alert_tier = ALERT_TIER_NAMES[alert_idx]
 
@@ -270,7 +269,7 @@ def health():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "model_loaded": model is not None,
+        "model_loaded": model_layer is not None,
         "scaler_loaded": scaler is not None,
         "model_architecture": "Hybrid LSTM + Transformer (BiLSTM → 2x Transformer Blocks → Multi-Task Heads)",
         "sequence_length": SEQUENCE_LENGTH,

@@ -7,17 +7,17 @@ import numpy as np
 # Configuration
 API_URL = "http://localhost:8000/predict"
 # Dataset is at the root directory of the project
-DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "methane_raw_training_dataset.csv")
+DATASET_PATH = r"c:\Users\KIIT\Downloads\methane_raw_training_dataset.csv"
 SENSOR_ID = "SEN-SIM-01"
-DELAY_SECONDS = 2.0  # Send a reading every 2 seconds in dataset)
+DELAY_SECONDS = 4.5  # Throttle to ~13 req/min to respect Gemini 15 req/min free-tier quota
 
 def prepare_data():
     if not os.path.exists(DATASET_PATH):
         print(f"Error: Dataset not found at {DATASET_PATH}")
         return None
         
-    print(f"Loading dataset from {CSV_PATH}...")
-    df = pd.read_csv(CSV_PATH)
+    print(f"Loading dataset from {DATASET_PATH}...")
+    df = pd.read_csv(DATASET_PATH)
     
     # Sort by timestamp to simulate chronological flow
     df['timestamp'] = pd.to_datetime(df['timestamp'])
