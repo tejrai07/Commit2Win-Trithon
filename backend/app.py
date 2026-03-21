@@ -269,9 +269,9 @@ def make_prediction(sensor_id: str, buffer: deque) -> dict:
         "temperature_celsius": float(raw_features[-1][1]) if len(raw_features[-1]) > 1 else 0.0,
         "pressure_kPa": float(raw_features[-1][2]) if len(raw_features[-1]) > 2 else 0.0,
         "feature_importance": {
-            "TEMP STR": float(round(40 + (float(raw_features[-1][1]) % 10), 1)),
-            "CH4 GRAD": float(round(30 + (float(raw_features[-1][0]) % 15), 1)),
-            "PRESS VAR": float(round(20 + (float(raw_features[-1][2]) % 8), 1)),
+            "TEMP STR": float(round(float(40.0 + (float(raw_features[-1][1]) % 10.0)), 1)),
+            "CH4 GRAD": float(round(float(30.0 + (float(raw_features[-1][0]) % 15.0)), 1)),
+            "PRESS VAR": float(round(float(20.0 + (float(raw_features[-1][2]) % 8.0)), 1)),
         },
         "buffer_size": len(buffer),
         "buffer_full": len(buffer) == SEQUENCE_LENGTH,
@@ -335,7 +335,7 @@ def predict(reading: SensorReading):
 
         if len(buffer) < SEQUENCE_LENGTH:
             # Buffer not yet full — return a "buffering" response
-            return PredictionResponse(
+            buffering_res = PredictionResponse(
                 sensor_id=reading.sensor_id,
                 location=reading.location,
                 timestamp=reading_time,
@@ -351,9 +351,16 @@ def predict(reading: SensorReading):
                 explainable_ai_reasoning=None,
                 temperature_celsius=reading.temperature_celsius,
                 pressure_kPa=reading.pressure_kPa,
+                feature_importance={
+                    "TEMP STR": 0.0,
+                    "CH4 GRAD": 0.0,
+                    "PRESS VAR": 0.0
+                },
                 buffer_size=len(buffer),
                 buffer_full=False,
             )
+            prediction_buffer.append(buffering_res.dict())
+            return buffering_res
 
         # Buffer full — make a real prediction
         result = make_prediction(reading.sensor_id, buffer)
@@ -418,6 +425,11 @@ def predict_batch(batch: BatchSensorReading):
                 explainable_ai_reasoning=None,
                 temperature_celsius=reading.temperature_celsius,
                 pressure_kPa=reading.pressure_kPa,
+                feature_importance={
+                    "TEMP STR": 0.0,
+                    "CH4 GRAD": 0.0,
+                    "PRESS VAR": 0.0
+                },
                 buffer_size=len(buffer),
                 buffer_full=False,
             ))
