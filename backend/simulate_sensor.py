@@ -37,6 +37,7 @@ def simulate_stream(df):
         for index, row in df.iterrows():
             payload = {
                 "sensor_id": SENSOR_ID,
+                "location": str(row["location"]),
                 "timestamp": row["timestamp"].isoformat() + "Z",
                 "ch4_concentration_ppm": float(row["ch4_concentration_ppm"]),
                 "temperature_celsius": float(row["temperature_celsius"]),
