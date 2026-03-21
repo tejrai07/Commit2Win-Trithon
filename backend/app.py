@@ -140,6 +140,8 @@ class PredictionResponse(BaseModel):
     alert_tier_confidence: dict
     actions_triggered: List[str]                  
     explainable_ai_reasoning: Optional[str]       
+    temperature_celsius: float
+    pressure_kPa: float
     buffer_size: int
     buffer_full: bool
 
@@ -168,8 +170,12 @@ class HealthResponse(BaseModel):
 def get_ai_explanation(alert_tier: str, latest_features: list) -> str:
     """Uses Gemini API to explain the alert tier based on the latest sensor window."""
     if not genai_client:
-        return f"Fallback reasoning: System detected signature of {alert_tier} without AI context enabled."
-        
+        # Fallback when Gemini is unavailable or rate‑limited
+        # latest_features follows the order defined in FEATURE_COLS; temperature is index 1, pressure is index 2
+        temp = latest_features[1] if len(latest_features) > 1 else 'N/A'
+        pressure = latest_features[2] if len(latest_features) > 2 else 'N/A'
+        return f"Fallback reasoning: Temp {temp}°C, Pressure {pressure} kPa – sensor combo matches a {alert_tier} pattern."
+
     try:
         metrics_summary = f"Methane: {latest_features[0]}ppm, Temp: {latest_features[1]}C, Change Rate: {latest_features[9]}ppm/m, LEL: {latest_features[10]*100}%"
         
@@ -186,7 +192,9 @@ def get_ai_explanation(alert_tier: str, latest_features: list) -> str:
         return str(response.text).strip()
     except Exception as e:
         print(f"Gemini API Error: {e}")
-        return f"AI Rate Limit Exceeded: The current sensor combination resembles past {alert_tier} signatures (Showing cached heuristic)."
+        temp = latest_features[1] if len(latest_features) > 1 else 'N/A'
+        pressure = latest_features[2] if len(latest_features) > 2 else 'N/A'
+        return f"AI Rate Limit Exceeded: Temp {temp}°C, Pressure {pressure} kPa – current sensor combo resembles past {alert_tier} signatures (Showing cached heuristic)."
 
 
 def make_prediction(sensor_id: str, buffer: deque) -> dict:
@@ -246,6 +254,8 @@ def make_prediction(sensor_id: str, buffer: deque) -> dict:
         },
         "actions_triggered": actions_triggered,
         "explainable_ai_reasoning": explainable_ai_reasoning,
+        "temperature_celsius": float(raw_features[-1][1]) if len(raw_features[-1]) > 1 else 0.0,
+        "pressure_kPa": float(raw_features[-1][2]) if len(raw_features[-1]) > 2 else 0.0,
         "buffer_size": len(buffer),
         "buffer_full": len(buffer) == SEQUENCE_LENGTH,
     }
@@ -318,6 +328,8 @@ def predict(reading: SensorReading):
                 },
                 actions_triggered=[],
                 explainable_ai_reasoning=None,
+                temperature_celsius=reading.temperature_celsius,
+                pressure_kPa=reading.pressure_kPa,
                 buffer_size=len(buffer),
                 buffer_full=False,
             )
@@ -376,6 +388,8 @@ def predict_batch(batch: BatchSensorReading):
                 },
                 actions_triggered=[],
                 explainable_ai_reasoning=None,
+                temperature_celsius=reading.temperature_celsius,
+                pressure_kPa=reading.pressure_kPa,
                 buffer_size=len(buffer),
                 buffer_full=False,
             ))
