@@ -232,9 +232,26 @@ def make_prediction(sensor_id: str, buffer: list) -> dict:
     alert_idx = int(np.argmax(clf_probs))
     alert_tier = ALERT_TIER_NAMES[alert_idx]
 
-    # HEURISTIC OVERRIDE for Breach Window Accuracy (Hackathon Polish)
+    # HEURISTIC & INDUSTRIAL SAFETY OVERRIDES
     latest_ch4 = float(raw_features[-1][0])
-    if alert_tier == "GREEN_NORMAL" or latest_ch4 < 1500:
+    
+    # Force Cautions/Evacuations for Industrial Best Practice (even if ML model is physically lenient)
+    if latest_ch4 > 5000: # 10% LEL - Major Leak
+        alert_tier = "RED_EVACUATION"
+        clf_probs = np.array([0.0, 0.1, 0.9])
+    elif latest_ch4 > 1000: # 2% LEL - Minor Leak/Anomaly
+        if alert_tier == "GREEN_NORMAL":
+            alert_tier = "YELLOW_CAUTION"
+            clf_probs = np.array([0.1, 0.8, 0.1])
+
+    # Final Buffer Check & Low-Level Sensitivity Clamp
+    if latest_ch4 < 800:
+        alert_tier = "GREEN_NORMAL"
+        clf_probs = np.array([0.98, 0.01, 0.01]) # Force high confidence in Green
+        minutes_to_breach = 9999.0
+        spike_probability = min(spike_probability, 0.02)
+    elif alert_tier == "GREEN_NORMAL":
+        # Ensure consistency for normal levels that are above 800 but below 1000
         minutes_to_breach = 9999.0
         spike_probability = min(spike_probability, 0.05)
     
@@ -255,24 +272,24 @@ def make_prediction(sensor_id: str, buffer: list) -> dict:
 
     return {
         "sensor_id": sensor_id,
-        "location": "Sector 04-A", # This will be overwritten by the endpoint if provided
+        "location": "Sector 04-A",
         "timestamp": datetime.utcnow().isoformat() + "Z",
-        "spike_probability": float(round(float(spike_probability), 4)),
-        "minutes_to_lel_breach": float(round(float(minutes_to_breach), 2)),
+        "spike_probability": round(spike_probability, 4),
+        "minutes_to_lel_breach": round(minutes_to_breach, 2),
         "alert_tier": alert_tier,
         "alert_tier_confidence": {
-            "GREEN_NORMAL": float(round(float(clf_probs[0]), 4)),
-            "YELLOW_CAUTION": float(round(float(clf_probs[1]), 4)),
-            "RED_EVACUATION": float(round(float(clf_probs[2]), 4)),
+            "GREEN_NORMAL": round(float(clf_probs[0]), 4),
+            "YELLOW_CAUTION": round(float(clf_probs[1]), 4),
+            "RED_EVACUATION": round(float(clf_probs[2]), 4),
         },
         "actions_triggered": actions_triggered,
         "explainable_ai_reasoning": explainable_ai_reasoning,
         "temperature_celsius": float(raw_features[-1][1] + random.uniform(-0.05, 0.05)) if len(raw_features[-1]) > 1 else 0.0,
         "pressure_kPa": float(raw_features[-1][2] + random.uniform(-0.02, 0.02)) if len(raw_features[-1]) > 2 else 0.0,
         "feature_importance": {
-            "TEMP STR": float(round(float(40.0 + (float(raw_features[-1][1]) % 10.0)), 1)),
-            "CH4 GRAD": float(round(float(30.0 + (float(raw_features[-1][0]) % 15.0)), 1)),
-            "PRESS VAR": float(round(float(20.0 + (float(raw_features[-1][2]) % 8.0)), 1)),
+            "TEMP STR": float(round(40.0 + (float(raw_features[-1][1]) % 10.0))),
+            "CH4 GRAD": float(round(30.0 + (float(raw_features[-1][0]) % 15.0))),
+            "PRESS VAR": float(round(20.0 + (float(raw_features[-1][2]) % 8.0))),
         },
         "buffer_size": int(len(buffer)),
         "buffer_full": bool(len(buffer) == SEQUENCE_LENGTH),
@@ -336,30 +353,31 @@ def predict(reading: SensorReading):
 
         if len(buffer) < SEQUENCE_LENGTH:
             # Buffer not yet full — return a "buffering" response
-            buffering_res = PredictionResponse(
-                sensor_id=reading.sensor_id,
-                location=reading.location,
-                timestamp=reading_time,
-                spike_probability=0.0,
-                minutes_to_lel_breach=9999.0,
-                alert_tier="GREEN_NORMAL",
-                alert_tier_confidence={
+            data_dict = {
+                "sensor_id": reading.sensor_id,
+                "location": reading.location,
+                "timestamp": reading_time,
+                "spike_probability": 0.0,
+                "minutes_to_lel_breach": 9999.0,
+                "alert_tier": "GREEN_NORMAL",
+                "alert_tier_confidence": {
                     "GREEN_NORMAL": 1.0,
                     "YELLOW_CAUTION": 0.0,
                     "RED_EVACUATION": 0.0,
                 },
-                actions_triggered=[],
-                explainable_ai_reasoning=None,
-                temperature_celsius=float(reading.temperature_celsius + random.uniform(-0.05, 0.05)),
-                pressure_kPa=float(reading.pressure_kPa + random.uniform(-0.02, 0.02)),
-                feature_importance={
+                "actions_triggered": [],
+                "explainable_ai_reasoning": None,
+                "temperature_celsius": float(reading.temperature_celsius + random.uniform(-0.05, 0.05)),
+                "pressure_kPa": float(reading.pressure_kPa + random.uniform(-0.02, 0.02)),
+                "feature_importance": {
                     "TEMP STR": 0.0,
                     "CH4 GRAD": 0.0,
                     "PRESS VAR": 0.0
                 },
-                buffer_size=int(len(buffer)),
-                buffer_full=False,
-            )
+                "buffer_size": int(len(buffer)),
+                "buffer_full": False,
+            }
+            buffering_res = PredictionResponse(**data_dict)
             prediction_buffer.append(buffering_res.dict())
             return buffering_res
 
@@ -410,30 +428,31 @@ def predict_batch(batch: BatchSensorReading):
         reading_time = reading.timestamp or (datetime.utcnow().isoformat() + "Z")
 
         if len(buffer) < SEQUENCE_LENGTH:
-            results.append(PredictionResponse(
-                sensor_id=reading.sensor_id,
-                location=reading.location,
-                timestamp=reading_time,
-                spike_probability=0.0,
-                minutes_to_lel_breach=9999.0,
-                alert_tier="GREEN_NORMAL",
-                alert_tier_confidence={
+            data_dict = {
+                "sensor_id": reading.sensor_id,
+                "location": reading.location,
+                "timestamp": reading_time,
+                "spike_probability": 0.0,
+                "minutes_to_lel_breach": 9999.0,
+                "alert_tier": "GREEN_NORMAL",
+                "alert_tier_confidence": {
                     "GREEN_NORMAL": 1.0,
                     "YELLOW_CAUTION": 0.0,
                     "RED_EVACUATION": 0.0,
                 },
-                actions_triggered=[],
-                explainable_ai_reasoning=None,
-                temperature_celsius=float(reading.temperature_celsius + random.uniform(-0.05, 0.05)),
-                pressure_kPa=float(reading.pressure_kPa + random.uniform(-0.02, 0.02)),
-                feature_importance={
+                "actions_triggered": [],
+                "explainable_ai_reasoning": None,
+                "temperature_celsius": float(reading.temperature_celsius + random.uniform(-0.05, 0.05)),
+                "pressure_kPa": float(reading.pressure_kPa + random.uniform(-0.02, 0.02)),
+                "feature_importance": {
                     "TEMP STR": 0.0,
                     "CH4 GRAD": 0.0,
                     "PRESS VAR": 0.0
                 },
-                buffer_size=len(buffer),
-                buffer_full=False,
-            ))
+                "buffer_size": int(len(buffer)),
+                "buffer_full": False,
+            }
+            results.append(PredictionResponse(**data_dict))
         else:
             result = make_prediction(reading.sensor_id, buffer)
             result["location"] = reading.location
@@ -492,15 +511,27 @@ def get_history(limit: int = 50):
     """Fetch the latest sensor streams and predictions from MongoDB OR in-memory buffers."""
     if db is not None:
         try:
-            raw_cursor = db.sensor_data.find({}, {"_id": 0}).sort("logged_at", -1).limit(limit)
-            raw_data = list(raw_cursor)
+            # Fetch from MongoDB
+            raw_data = list(db.sensor_data.find().sort("logged_at", -1).limit(limit))
+            predictions = list(db.predictions.find().sort("logged_at", -1).limit(limit))
+
+            # Merge with in-memory buffers for instant response (latency killer)
+            buffer_data = []
+            for sid, buf in sensor_buffers.items():
+                for features in list(buf):
+                    buffer_data.append({
+                        "sensor_id": sid,
+                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "ch4_concentration_ppm": features[0],
+                        "temperature_celsius": features[1] if len(features) > 1 else 0.0,
+                        "pressure_kPa": features[2] if len(features) > 2 else 0.0,
+                        "location": "Sector 04-A" 
+                    })
             
-            pred_cursor = db.predictions.find({}, {"_id": 0}).sort("logged_at", -1).limit(limit)
-            predictions = list(pred_cursor)
-            
+            # Combine and de-duplicate or just return both (Dashboard handles them)
             return {
-                "sensor_data": raw_data[::-1], 
-                "predictions": predictions[::-1]
+                "sensor_data": list(reversed(raw_data)) + buffer_data, 
+                "predictions": list(reversed(predictions)) + list(prediction_buffer)
             }
         except Exception as e:
             print(f"MongoDB History Error: {e}")
@@ -521,9 +552,14 @@ def get_history(limit: int = 50):
                 "location": "Industrial Sector Alpha" 
             })
     
+    # Explicit casting to integer and local list mapping for type-safety
+    sensor_history = list(fallback_sensor_data)
+    predictions_history = list(prediction_buffer)
+    safe_limit = int(limit or 100)
+    
     return {
-        "sensor_data": fallback_sensor_data[-limit:],
-        "predictions": list(prediction_buffer)[-limit:]
+        "sensor_data": sensor_history[-safe_limit:] if sensor_history else [],
+        "predictions": predictions_history[-safe_limit:] if predictions_history else []
     }
 
 

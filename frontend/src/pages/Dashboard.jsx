@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://commit2win-trithon.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 // --- Sub-Components ---
 const GaugeChart = ({ probability = 0 }) => {
@@ -197,8 +197,11 @@ const Dashboard = () => {
     }
   };
 
-  const alertTier = latestPrediction?.alert_tier || "WAITING"; 
   const ch4Value = latestPrediction?.ch4_concentration_ppm || historicData[historicData.length - 1]?.sen001 || 0;
+  const rawAlertTier = latestPrediction?.alert_tier || "WAITING";
+  
+  // UI-Level Safety Override: Force Green if concentration is definitively low
+  const alertTier = (ch4Value < 800 && rawAlertTier !== "WAITING") ? "GREEN_NORMAL" : rawAlertTier;
   
   // Dynamic Graph Color Logic
   const graphColor = useMemo(() => {
