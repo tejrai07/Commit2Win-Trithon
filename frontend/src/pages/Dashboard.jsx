@@ -155,7 +155,7 @@ const Dashboard = () => {
 
     if (!isDemoMode && isStreamActive) {
         fetchLiveData();
-        const intervalId = setInterval(fetchLiveData, 4500); 
+        const intervalId = setInterval(fetchLiveData, 3000); // 3s polling for better feel
         return () => clearInterval(intervalId);
     }
   }, [isDemoMode, isStreamActive]);
@@ -172,18 +172,29 @@ const Dashboard = () => {
       } catch (e) { console.error("Status check failed:", e); }
     };
     checkStatus();
-    const id = setInterval(checkStatus, 10000);
+    const id = setInterval(checkStatus, 3000); // Poll every 3s instead of 10s
     return () => clearInterval(id);
   }, []);
 
   const toggleStream = async () => {
+    if (isDemoMode) setIsDemoMode(false); // Any toggle exits demo mode
+    
+    // Optimistic UI update
+    const nextState = !isStreamActive;
+    setIsStreamActive(nextState);
+
     try {
       const resp = await fetch(`${API_BASE_URL}/simulation/toggle`, { method: 'POST' });
       if (resp.ok) {
           const data = await resp.json();
           setIsStreamActive(data.active);
+      } else {
+          setIsStreamActive(!nextState); // Rollback on error
       }
-    } catch (e) { console.error("Toggle failed:", e); }
+    } catch (e) { 
+      console.error("Toggle failed:", e);
+      setIsStreamActive(!nextState); // Rollback on error
+    }
   };
 
   const alertTier = latestPrediction?.alert_tier || "WAITING"; 
@@ -228,8 +239,14 @@ const Dashboard = () => {
       temperature_celsius: 48.5,
       pressure_kPa: 112.4,
       location: "MINESHAFT SECTOR 4",
+      feature_importance: { "TEMP STR": 42, "CH4 GRAD": 35, "PRESS VAR": 23 },
       explainable_ai_reasoning: "CRITICAL: Detected immediate localized methane spike. Patterns correlate with high-pressure line rupture signatures."
     });
+
+    // Auto-exit demo mode after 45 seconds to return to live data
+    setTimeout(() => {
+        setIsDemoMode(false);
+    }, 45000);
   };
 
   const formatCountdown = (minutesDecimal) => {
@@ -307,6 +324,24 @@ const Dashboard = () => {
         </header>
 
         <main className="flex-1 p-6 flex flex-col gap-6 overflow-hidden relative bg-mesh">
+            
+            {/* Neural Core Synchronizing Overlay (when waiting for first readings) */}
+            {!isDemoMode && isStreamActive && historicData.length === 0 && (
+                <div className="absolute inset-0 z-[100] bg-slate-50/90 flex flex-col items-center justify-center backdrop-blur-sm transition-all duration-700">
+                    <div className="flex flex-col items-center gap-6 p-12 industrial-card border-none bg-white/80 shadow-2xl">
+                        <RefreshCw className="w-16 h-16 text-cyan-500 animate-spin-slow" />
+                        <div className="text-center">
+                            <h2 className="text-xl font-black text-slate-800 uppercase tracking-[0.4em] mb-2 text-glow">Synchronizing Neural Core</h2>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest animate-pulse italic">
+                                Calibrating predictive layers with live telemetry stream...
+                            </p>
+                        </div>
+                        <div className="w-64 h-[2px] bg-slate-100 relative overflow-hidden mt-4">
+                            <div className="absolute inset-y-0 left-0 bg-cyan-500 animate-[loading_2s_infinite]" style={{ width: '40%' }}></div>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* --- PRIMARY COMMAND ROW --- */}
             <div className="flex gap-6 h-[55%] flex-shrink-0">
