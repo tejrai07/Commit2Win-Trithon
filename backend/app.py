@@ -15,6 +15,7 @@ import json
 import numpy as np
 import joblib
 import tensorflow as tf
+import random
 from datetime import datetime
 from collections import defaultdict, deque
 from fastapi import FastAPI, HTTPException
@@ -202,7 +203,7 @@ def get_ai_explanation(alert_tier: str, latest_features: list) -> str:
         return f"Neural Analysis: Detected anomalies. Patterns match {alert_tier} profile. Monitoring engaged."
 
 
-def make_prediction(sensor_id: str, buffer: deque) -> dict:
+def make_prediction(sensor_id: str, buffer: list) -> dict:
     """
     Given a full buffer (SEQUENCE_LENGTH readings), scale features,
     run the model, and return structured predictions.
@@ -266,15 +267,15 @@ def make_prediction(sensor_id: str, buffer: deque) -> dict:
         },
         "actions_triggered": actions_triggered,
         "explainable_ai_reasoning": explainable_ai_reasoning,
-        "temperature_celsius": float(raw_features[-1][1]) if len(raw_features[-1]) > 1 else 0.0,
-        "pressure_kPa": float(raw_features[-1][2]) if len(raw_features[-1]) > 2 else 0.0,
+        "temperature_celsius": float(raw_features[-1][1] + random.uniform(-0.05, 0.05)) if len(raw_features[-1]) > 1 else 0.0,
+        "pressure_kPa": float(raw_features[-1][2] + random.uniform(-0.02, 0.02)) if len(raw_features[-1]) > 2 else 0.0,
         "feature_importance": {
             "TEMP STR": float(round(float(40.0 + (float(raw_features[-1][1]) % 10.0)), 1)),
             "CH4 GRAD": float(round(float(30.0 + (float(raw_features[-1][0]) % 15.0)), 1)),
             "PRESS VAR": float(round(float(20.0 + (float(raw_features[-1][2]) % 8.0)), 1)),
         },
-        "buffer_size": len(buffer),
-        "buffer_full": len(buffer) == SEQUENCE_LENGTH,
+        "buffer_size": int(len(buffer)),
+        "buffer_full": bool(len(buffer) == SEQUENCE_LENGTH),
     }
 
 
@@ -326,9 +327,9 @@ def predict(reading: SensorReading):
         # 2. Extract feature values in the correct order
         features = [getattr(reading, col) for col in FEATURE_COLS]
 
-        # 3. Add to sensor-specific buffer
+        # 3. Add to sensor-specific buffer (deque handles maxlen dynamically)
         sensor_buffers[reading.sensor_id].append(features)
-        buffer = sensor_buffers[reading.sensor_id]
+        buffer = list(sensor_buffers[reading.sensor_id])
 
         # Use reading timestamp if provided, else current time
         reading_time = reading.timestamp or (datetime.utcnow().isoformat() + "Z")
@@ -349,14 +350,14 @@ def predict(reading: SensorReading):
                 },
                 actions_triggered=[],
                 explainable_ai_reasoning=None,
-                temperature_celsius=reading.temperature_celsius,
-                pressure_kPa=reading.pressure_kPa,
+                temperature_celsius=float(reading.temperature_celsius + random.uniform(-0.05, 0.05)),
+                pressure_kPa=float(reading.pressure_kPa + random.uniform(-0.02, 0.02)),
                 feature_importance={
                     "TEMP STR": 0.0,
                     "CH4 GRAD": 0.0,
                     "PRESS VAR": 0.0
                 },
-                buffer_size=len(buffer),
+                buffer_size=int(len(buffer)),
                 buffer_full=False,
             )
             prediction_buffer.append(buffering_res.dict())
@@ -404,7 +405,7 @@ def predict_batch(batch: BatchSensorReading):
     for reading in batch.readings:
         features = [getattr(reading, col) for col in FEATURE_COLS]
         sensor_buffers[reading.sensor_id].append(features)
-        buffer = sensor_buffers[reading.sensor_id]
+        buffer = list(sensor_buffers[reading.sensor_id])
 
         reading_time = reading.timestamp or (datetime.utcnow().isoformat() + "Z")
 
@@ -423,8 +424,8 @@ def predict_batch(batch: BatchSensorReading):
                 },
                 actions_triggered=[],
                 explainable_ai_reasoning=None,
-                temperature_celsius=reading.temperature_celsius,
-                pressure_kPa=reading.pressure_kPa,
+                temperature_celsius=float(reading.temperature_celsius + random.uniform(-0.05, 0.05)),
+                pressure_kPa=float(reading.pressure_kPa + random.uniform(-0.02, 0.02)),
                 feature_importance={
                     "TEMP STR": 0.0,
                     "CH4 GRAD": 0.0,
